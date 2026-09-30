@@ -1,5 +1,7 @@
 # ⌚ Edge AI 智慧手錶 SoC 晶片設計與模擬驗證平台
 
+[繁體中文](README.md) | [English](README_EN.md) | [日本語](README_JA.md)
+
 本專案為應用於超低功耗智慧手錶的 **兩級語音喚醒（Two-Stage Voice Wakeup）系統單晶片（SoC）**。包含演算法黃金模型、Verilog RTL 硬體描述、RISC-V 嵌入式韌體、以及具備圖形化介面（Web GUI）的週期與位元精確模擬器。
 
 ---
