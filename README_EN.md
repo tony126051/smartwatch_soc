@@ -155,6 +155,7 @@ The on-board LED register at `0x8000_0000` indicates system phases:
 - `0x55`: Non-keyword / noise $\to$ System returns to sleep
 
 ### 4. Technical Documentation (English)
+- 📑 **Spec-Driven Development (SDD) & AI Agent Guide**: [`docs/spec/en/README.md`](docs/spec/en/README.md) *(Architecture, APB Interfaces, INT8 Math, Firmware & Verification Specs)*
 - 🔰 Developer Onboarding Guide: [`docs/en/developer_onboarding_guide.md`](docs/en/developer_onboarding_guide.md)
 - 🕹️ Simulator Architecture & CLI Guide: [`docs/en/simulator_guide.md`](docs/en/simulator_guide.md)
 - 🏛️ System Architecture Specification: [`docs/en/system_architecture.md`](docs/en/system_architecture.md)

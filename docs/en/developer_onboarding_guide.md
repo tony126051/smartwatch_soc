@@ -124,3 +124,12 @@ Open `sim/waves_soc.vcd` with GTKWave or inspect `sim/simulator_dashboard.html` 
 - **Embedded Firmware** ([`sw/`](../../sw/)):
   - `app/main.s`: Bootloader, peripheral setup, ISR, and sleep control.
   - `build_firmware.py`: Pure Python lightweight RISC-V assembler.
+
+---
+
+## 5. Specification & AI Agent Contracts
+For complete bitfield definitions, APB protocol timing, INT8 math formulas, and AI agent operating instructions, please refer to:
+- 📑 **[Spec-Driven Development (SDD) Master Suite](../spec/en/README.md)**
+- 🏛️ **[System Architecture Specification](system_architecture.md)**
+- 📋 **[APB Register Map Manual](register_map.md)**
+

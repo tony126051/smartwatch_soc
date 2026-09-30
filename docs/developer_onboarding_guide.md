@@ -153,4 +153,4 @@ python3 sim/web_server.py 8888
 
 ---
 
-祝您開發順利！若有任何硬體規格疑義，可隨時參閱 [`docs/system_architecture.md`](file:///home/tony/repo/projects/smart_watch/docs/system_architecture.md) 與 [`docs/simulator_guide.md`](file:///home/tony/repo/projects/smart_watch/docs/simulator_guide.md)。
+祝您開發順利！若有任何硬體規格疑義，可隨時參閱 [`docs/spec/README.md`](spec/README.md)（規格驅動開發與 AI Agent 規範體系）、[`docs/system_architecture.md`](file:///home/tony/repo/projects/smart_watch/docs/system_architecture.md) 與 [`docs/simulator_guide.md`](file:///home/tony/repo/projects/smart_watch/docs/simulator_guide.md)。
