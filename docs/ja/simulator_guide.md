@@ -86,6 +86,11 @@ python3 sim/run_simulator.py --mode interactive --lang ja
 python3 sim/web_server.py 8080
 ```
 ブラウザで `http://localhost:8080/` にアクセスします。主な機能：
+
+<p align="center">
+  <img src="../assets/simulator_gui_preview.png" alt="Smartwatch SoC Simulator Web GUI" width="100%" style="border-radius: 6px;" />
+</p>
+
 1. **多言語切替セレクタ**：日本語、英語、繁体字、簡体字をリアルタイム切り替え。
 2. **コントロールツールバー**：`Run`、`Step`、`50ステップ早送り`、`Reset`。
 3. **音声刺激注入**：音声、無音、ノイズの即時注入。

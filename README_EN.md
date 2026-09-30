@@ -4,6 +4,12 @@
 
 This project provides a complete **Two-Stage Voice Wakeup System-on-Chip (SoC)** designed for ultra-low-power smartwatches. It includes golden algorithm models, Verilog RTL descriptions, RISC-V embedded firmware, and a cycle-accurate, bit-true simulator equipped with a real-time interactive HTML5 Web GUI.
 
+<p align="center">
+  <img src="docs/assets/simulator_gui_preview.png" alt="Smartwatch SoC Interactive Simulator Web GUI" width="100%" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
+  <br>
+  <em>▲ Live Interactive Web GUI Simulator featuring real-time multi-language switching, hardware FSM pipeline tracking, and dynamic power profiling.</em>
+</p>
+
 ---
 
 ## 🚀 Quick Start (Under 30 Seconds)

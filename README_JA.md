@@ -4,6 +4,12 @@
 
 本プロジェクトは、超低消費電力スマートウォッチ向けの **2段階音声起動（Two-Stage Voice Wakeup）システムオンチップ（SoC）** です。アルゴリズムのゴールデンモデル、Verilog RTL ハードウェア記述、RISC-V 組込みファームウェア、およびリアルタイム HTML5 Web GUI を備えたサイクル正確・ビット完全なシミュレータを含んでいます。
 
+<p align="center">
+  <img src="docs/assets/simulator_gui_preview.png" alt="Smartwatch SoC Interactive Simulator Web GUI" width="100%" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
+  <br>
+  <em>▲ 多言語リアルタイム切替、ハードウェア状態遷移パイプライン追跡、動的消費電力分析を備えた Web GUI シミュレータ画面</em>
+</p>
+
 ---
 
 ## 🚀 30秒クイックスタート (Quick Start)

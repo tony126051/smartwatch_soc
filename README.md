@@ -4,6 +4,12 @@
 
 本專案為應用於超低功耗智慧手錶的 **兩級語音喚醒（Two-Stage Voice Wakeup）系統單晶片（SoC）**。包含演算法黃金模型、Verilog RTL 硬體描述、RISC-V 嵌入式韌體、以及具備圖形化介面（Web GUI）的週期與位元精確模擬器。
 
+<p align="center">
+  <img src="docs/assets/simulator_gui_preview.png" alt="Smartwatch SoC Interactive Simulator Web GUI" width="100%" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
+  <br>
+  <em>▲ 具備多國語言即時切換、硬體狀態機動態追蹤與功耗即時分析的視覺化 Web GUI 模擬器介面</em>
+</p>
+
 ---
 
 ## 🚀 30 秒快速上手 (Quick Start)

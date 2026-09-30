@@ -70,6 +70,10 @@ python3 sim/run_simulator.py --mode scenario --vcd sim/waves_soc.vcd --dashboard
   # 接著在瀏覽器存取 http://localhost:8080/smartwatch_simulator_ui.html
   ```
 
+<p align="center">
+  <img src="assets/simulator_gui_preview.png" alt="Smartwatch SoC Simulator Web GUI" width="100%" style="border-radius: 6px;" />
+</p>
+
 **UI 介面特色功能：**
 1. **多國語言即時切換 (i18n)**：介面頂端提供語言下拉選單，支援 **繁體中文 (Traditional Chinese)**、**English (英文)**、**简体中文 (Simplified Chinese)** 與 **日本語 (Japanese)** 即時切換，並自動保存使用者偏好。
 2. **互動控制台**：提供 `Run`（連續運行）、`Step`（單步執行）、`快進 50 步` 與 `Reset` 控制按鈕。

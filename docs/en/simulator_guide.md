@@ -85,7 +85,13 @@ Launch the built-in HTTP server:
 ```bash
 python3 sim/web_server.py 8080
 ```
-Open browser at `http://localhost:8080/`. Features include:
+Open browser at `http://localhost:8080/`.
+
+<p align="center">
+  <img src="../assets/simulator_gui_preview.png" alt="Smartwatch SoC Simulator Web GUI" width="100%" style="border-radius: 6px;" />
+</p>
+
+Features include:
 1. **Multi-Language Selector**: Real-time switching between English, Traditional Chinese, Simplified Chinese, and Japanese.
 2. **Interactive Controls**: `Run`, `Step`, `Fast Forward 50`, `Reset`.
 3. **Audio Stimulus**: Live injection of speech, silence, and tone noise.
