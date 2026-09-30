@@ -148,6 +148,12 @@ python3 sw/build_firmware.py sw/app/main.s sw/firmware.hex
 - `0xAA`：キーワード一致 🎯 画面全点灯 (MATCH)
 - `0x55`：非キーワード / 雑音 $\to$ スリープ状態へ復帰
 
+### 4. 技術ドキュメント (日本語版)
+- 🔰 開発者オンボーディングガイド：[`docs/ja/developer_onboarding_guide.md`](docs/ja/developer_onboarding_guide.md)
+- 🕹️ シミュレータ操作・アーキテクチャ詳細手引：[`docs/ja/simulator_guide.md`](docs/ja/simulator_guide.md)
+- 🏛️ システムアーキテクチャ設計仕様書：[`docs/ja/system_architecture.md`](docs/ja/system_architecture.md)
+- 📋 APB レジスタマップ手引：[`docs/ja/register_map.md`](docs/ja/register_map.md)
+
 ---
 
 ## 📊 主要仕様と PPA 特性

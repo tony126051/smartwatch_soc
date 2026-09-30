@@ -1,6 +1,8 @@
 # Smartwatch SoC KWS 加速器暫存器手冊 (Register Map)
 
-基底位址：`0x4000_0000`
+[繁體中文](register_map.md) | [English](en/register_map.md) | [日本語](ja/register_map.md)
+
+基底位址：`0x4000_0000`  
 匯流排協議：AMBA APB (32-bit 資料匯流排)
 
 | 偏移位址 (Offset) | 暫存器名稱 | 讀/寫 | 預設值 | 欄位說明 |

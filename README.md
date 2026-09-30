@@ -133,6 +133,7 @@ python3 sw/build_firmware.py sw/app/main.s sw/firmware.hex
 可直接於軟體中寫入 `0x4000_0014`（`REG_VAD_THRESHOLD`），預設值為 `200000`。亦可修改 [`sw/app/main.s`](file:///home/tony/repo/projects/smart_watch/sw/app/main.s) 中的初始化參數。
 
 ### 查看詳細手冊
-- 新人入職快速上手：[`docs/developer_onboarding_guide.md`](file:///home/tony/repo/projects/smart_watch/docs/developer_onboarding_guide.md)
-- 模擬器技術架構手冊：[`docs/simulator_guide.md`](file:///home/tony/repo/projects/smart_watch/docs/simulator_guide.md)
-- APB 暫存器手冊：[`docs/register_map.md`](file:///home/tony/repo/projects/smart_watch/docs/register_map.md)
+- 🔰 新人入職快速上手：[`docs/developer_onboarding_guide.md`](docs/developer_onboarding_guide.md) ([English](docs/en/developer_onboarding_guide.md) / [日本語](docs/ja/developer_onboarding_guide.md))
+- 🕹️ 模擬器技術架構手冊：[`docs/simulator_guide.md`](docs/simulator_guide.md) ([English](docs/en/simulator_guide.md) / [日本語](docs/ja/simulator_guide.md))
+- 🏛️ 系統架構設計規範：[`docs/system_architecture.md`](docs/system_architecture.md) ([English](docs/en/system_architecture.md) / [日本語](docs/ja/system_architecture.md))
+- 📋 APB 暫存器手冊：[`docs/register_map.md`](docs/register_map.md) ([English](docs/en/register_map.md) / [日本語](docs/ja/register_map.md))

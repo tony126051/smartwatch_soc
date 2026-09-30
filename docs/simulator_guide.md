@@ -1,5 +1,7 @@
 # Smartwatch SoC 模擬器使用與架構手冊 (Simulator Guide)
 
+[繁體中文](simulator_guide.md) | [English](en/simulator_guide.md) | [日本語](ja/simulator_guide.md)
+
 本模擬器為專為 **Edge AI 智慧手錶 SoC 晶片設計** 所開發之全系統（Full-System）、週期精確（Cycle-Accurate）暨位元精確（Bit-True）模擬與硬體除錯環境。
 
 ---

@@ -1,5 +1,7 @@
 # Edge AI 智慧手錶 SoC 系統架構設計規範 (System Architecture Specification)
 
+[繁體中文](system_architecture.md) | [English](en/system_architecture.md) | [日本語](ja/system_architecture.md)
+
 ## 1. 概述 (Overview)
 本 SoC 專為超低功耗穿戴式智慧手錶所設計，具備兩級 Always-on 語音喚醒階層架構（Two-Stage Wakeup Hierarchy），全系統記憶體與特徵緩衝區完全常駐於晶片內 SRAM（On-chip SRAM / BRAM），杜絕任何外部 DRAM 存取耗電。
 

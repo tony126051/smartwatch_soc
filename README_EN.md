@@ -148,6 +148,12 @@ The on-board LED register at `0x8000_0000` indicates system phases:
 - `0xAA`: Target keyword matched 🎯 $\to$ Watch screen turns on
 - `0x55`: Non-keyword / noise $\to$ System returns to sleep
 
+### 4. Technical Documentation (English)
+- 🔰 Developer Onboarding Guide: [`docs/en/developer_onboarding_guide.md`](docs/en/developer_onboarding_guide.md)
+- 🕹️ Simulator Architecture & CLI Guide: [`docs/en/simulator_guide.md`](docs/en/simulator_guide.md)
+- 🏛️ System Architecture Specification: [`docs/en/system_architecture.md`](docs/en/system_architecture.md)
+- 📋 APB Register Map Manual: [`docs/en/register_map.md`](docs/en/register_map.md)
+
 ---
 
 ## 📊 Key Specifications & PPA
@@ -158,3 +164,4 @@ The on-board LED register at `0x8000_0000` indicates system phases:
 - **Stage-2 NPU Latency**: 28,688 cycles (**2.33 ms** @ 12.288 MHz)
 - **On-Chip Memory**: 16 KB SRAM Total (8 KB ITCM + 8 KB DTCM, zero DRAM)
 - **Battery Life Projection**: **> 10 Days** under typical wearable use (200 mAh Li-Po)
+

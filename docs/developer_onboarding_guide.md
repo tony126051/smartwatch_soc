@@ -1,5 +1,7 @@
 # 🔰 新進開發人員快速上手與導覽指南 (Developer Onboarding Guide)
 
+[繁體中文](developer_onboarding_guide.md) | [English](en/developer_onboarding_guide.md) | [日本語](ja/developer_onboarding_guide.md)
+
 歡迎加入 **Edge AI 智慧手錶 SoC 晶片設計專案**！本文件專為新進工程師（演算法、數位 IC 設計、韌體工程師）所編寫，目標讓您在 **10 分鐘內** 理解全系統架構、啟動模擬器、修改韌體並進行硬體驗證。
 
 ---
