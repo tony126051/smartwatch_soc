@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Simulation waveform dumps & build artifacts
+*.vcd
+*.vvp
+*.o
+*.out
+
+# OS / Editor temporary files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~

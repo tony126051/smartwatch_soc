@@ -1,0 +1,4 @@
+# Predicted_Class Score_0 Score_1
+0 83 -72
+# GAP Outputs (8 channels):
+0 0 0 2 0 0 1 0

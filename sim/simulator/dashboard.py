@@ -1,0 +1,596 @@
+"""
+Interactive Smartwatch SoC Simulator HTML5 Dashboard Generator
+With Multi-Language (i18n) Support: zh-TW, en, zh-CN, ja.
+Produces a self-contained, interactive single-page dashboard with SVG waveforms,
+architecture visualization, register view, and power analysis.
+"""
+
+import json
+from typing import Dict, Any, List
+
+def generate_dashboard_html(summary_data: Dict[str, Any], trace_history: List[Dict[str, Any]], output_path: str = "sim/simulator_dashboard.html", default_lang: str = "zh-TW"):
+    summary_json = json.dumps(summary_data, indent=2)
+    trace_json = json.dumps(trace_history, indent=2)
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n="dashTitle">Smartwatch SoC 系統全周期架構模擬器 (System Simulator Dashboard)</title>
+<style>
+  :root {{
+    --bg-dark: #0f172a;
+    --card-bg: #1e293b;
+    --border: #334155;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent-blue: #38bdf8;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-purple: #c084fc;
+  }}
+  * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }}
+  body {{ background: var(--bg-dark); color: var(--text-primary); padding: 24px; }}
+  header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }}
+  h1 {{ font-size: 22px; font-weight: 700; color: var(--accent-blue); display: flex; align-items: center; gap: 10px; }}
+  .badge {{ background: #0369a1; color: #e0f2fe; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; display: inline-block; }}
+  .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; margin-bottom: 24px; }}
+  .card {{ background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }}
+  .card-title {{ font-size: 15px; font-weight: 600; color: var(--accent-blue); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 14px; display: flex; justify-content: space-between; }}
+  .stat-row {{ display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }}
+  .stat-label {{ color: var(--text-secondary); }}
+  .stat-val {{ font-weight: 600; }}
+  .stat-val.active {{ color: var(--accent-green); }}
+  .stat-val.warn {{ color: var(--accent-amber); }}
+  .stat-val.match {{ color: #22c55e; font-weight: 800; }}
+  .led-display {{ display: flex; gap: 8px; margin-top: 10px; justify-content: center; }}
+  .led-lamp {{ width: 28px; height: 28px; border-radius: 50%; background: #334155; border: 2px solid #475569; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #64748b; }}
+  .led-lamp.on {{ background: #22c55e; border-color: #86efac; color: #022c22; box-shadow: 0 0 12px #22c55e; }}
+  .led-lamp.on-amber {{ background: #f59e0b; border-color: #fde68a; color: #451a03; box-shadow: 0 0 12px #f59e0b; }}
+  .meter-bar {{ height: 10px; background: #334155; border-radius: 5px; overflow: hidden; margin-top: 6px; }}
+  .meter-fill {{ height: 100%; transition: width 0.3s ease; }}
+  .meter-green {{ background: var(--accent-green); }}
+  .meter-amber {{ background: var(--accent-amber); }}
+  .meter-blue {{ background: var(--accent-blue); }}
+  .trace-table {{ width: 100%; border-collapse: collapse; font-size: 12px; font-family: monospace; }}
+  .trace-table th {{ background: #0f172a; color: var(--text-secondary); text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }}
+  .trace-table td {{ padding: 6px 10px; border-bottom: 1px solid #1e293b; }}
+  .trace-table tr:hover {{ background: #334155; }}
+  .lang-select {{ background: #1e293b; color: #e2e8f0; border: 1px solid #475569; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; outline: none; }}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1><span>⌚</span> <span data-i18n="headTitle">Edge AI Smartwatch SoC 模擬器監控儀表板</span></h1>
+    <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;" data-i18n="headSubtitle">
+      RISC-V 32-bit (PicoRV32) + AFE CIC + Hardware VAD + Level-2 KWS DS-CNN NPU
+    </p>
+  </div>
+  <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <span style="font-size: 12px; color: var(--accent-blue); font-weight: bold;">🌐</span>
+      <select id="lang-select" class="lang-select" onchange="changeLanguage(this.value)">
+        <option value="zh-TW">繁體中文 (Traditional Chinese)</option>
+        <option value="en">English (英文)</option>
+        <option value="zh-CN">简体中文 (Simplified Chinese)</option>
+        <option value="ja">日本語 (Japanese)</option>
+      </select>
+    </div>
+    <span class="badge" data-i18n="clkBadge">SYS CLK: 12.288 MHz</span>
+    <span class="badge" style="background:#059669;" data-i18n="sramBadge">ON-CHIP SRAM: 16 KB</span>
+  </div>
+</header>
+
+<div class="grid">
+  <!-- System Overview & LEDs -->
+  <div class="card">
+    <div class="card-title">
+      <span data-i18n="c1Title">SoC 狀態與板載除錯 LED</span>
+      <span id="led-hex" style="color:var(--accent-amber);">0x00</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c1Cycles">系統運行週期 (Cycles)</span>
+      <span class="stat-val" id="total-cycles">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c1SimTime">模擬物理時間 (Time)</span>
+      <span class="stat-val" id="sim-time">0.00 ms</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c1State">當前狀態判定</span>
+      <span class="stat-val active" id="led-desc">Initializing...</span>
+    </div>
+    <div style="margin-top: 15px;">
+      <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; text-align: center;">DEBUG LED [7:0]</div>
+      <div class="led-display" id="led-array">
+        <!-- 8 LEDs -->
+      </div>
+    </div>
+  </div>
+
+  <!-- CPU Subsystem -->
+  <div class="card">
+    <div class="card-title">
+      <span data-i18n="c2Title">PicoRV32 RISC-V 處理器核心</span>
+      <span class="badge" style="background:#4338ca;">RV32I Core</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c2Pc">程式計數器 (PC)</span>
+      <span class="stat-val" id="cpu-pc" style="color:var(--accent-blue);">0x00000000</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c2Sleep">休眠狀態 (WFI / waitirq)</span>
+      <span class="stat-val" id="cpu-sleep">False</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c2Irq">中斷服務常式 (In ISR)</span>
+      <span class="stat-val" id="cpu-irq">False</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c2Insts">已執行指令總數</span>
+      <span class="stat-val" id="cpu-insts">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c2Mask">中斷遮罩 (IRQ Mask)</span>
+      <span class="stat-val" id="cpu-mask">0xFFFFFFFF</span>
+    </div>
+  </div>
+
+  <!-- AFE & VAD Subsystem -->
+  <div class="card">
+    <div class="card-title">
+      <span data-i18n="c3Title">音訊前端與硬體 VAD (第一級 Always-on)</span>
+      <span class="badge" style="background:#065f46;">&lt; 20 μW</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c3Fifo">AFE 採樣 / FIFO 緩衝區</span>
+      <span class="stat-val" id="afe-fifo">0 / 256 samples</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c3Thres">短時能量門檻 (Threshold)</span>
+      <span class="stat-val" id="vad-thres">200,000</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c3Ste">當前幀短時能量 (STE Energy)</span>
+      <span class="stat-val" id="vad-energy">0</span>
+    </div>
+    <div class="meter-bar">
+      <div class="meter-fill meter-green" id="vad-energy-bar" style="width: 0%;"></div>
+    </div>
+    <div class="stat-row" style="margin-top:10px;">
+      <span class="stat-label" data-i18n="c3Speech">語音活動旗標 (Speech Active)</span>
+      <span class="stat-val" id="vad-active">False</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c3Irq">喚醒中斷訊號 (irq_vad_wakeup)</span>
+      <span class="stat-val" id="vad-irq">False</span>
+    </div>
+  </div>
+
+  <!-- KWS NPU Subsystem -->
+  <div class="card">
+    <div class="card-title">
+      <span data-i18n="c4Title">KWS NPU 加速器 (第二級 DS-CNN INT8)</span>
+      <span class="badge" style="background:#701a75;" data-i18n="c4Badge">2.33 ms 推論</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c4State">NPU 狀態機 (FSM State)</span>
+      <span class="stat-val warn" id="npu-state">IDLE</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c4Flags">運算中標誌 (Busy / Done)</span>
+      <span class="stat-val" id="npu-flags">IDLE</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c4Score0">Class 0 得分 (背景雜音)</span>
+      <span class="stat-val" id="score-0">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c4Score1">Class 1 得分 (目標喚醒詞)</span>
+      <span class="stat-val" style="color:var(--accent-green);" id="score-1">0</span>
+    </div>
+    <div class="stat-row" style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px;">
+      <span class="stat-label" data-i18n="c4Verdict">喚醒詞判定結果</span>
+      <span class="stat-val" id="kw-detected">NO (Class 0)</span>
+    </div>
+  </div>
+
+  <!-- Power & Energy Profiler -->
+  <div class="card">
+    <div class="card-title">
+      <span data-i18n="c5Title">全晶片動態功耗與電池續航分析</span>
+      <span class="badge" style="background:#b45309;" data-i18n="c5Badge">200mAh 鋰聚合物</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c5Sleep">待機休眠佔空比 (Sleep Duty)</span>
+      <span class="stat-val" id="pwr-sleep-pct">0.0 %</span>
+    </div>
+    <div class="meter-bar">
+      <div class="meter-fill meter-blue" id="pwr-sleep-bar" style="width: 0%;"></div>
+    </div>
+    <div class="stat-row" style="margin-top: 10px;">
+      <span class="stat-label" data-i18n="c5Cpu">CPU 活躍比例 (Active)</span>
+      <span class="stat-val" id="pwr-cpu-pct">0.0 %</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c5Npu">NPU 推論比例 (Inference)</span>
+      <span class="stat-val" id="pwr-npu-pct">0.0 %</span>
+    </div>
+    <div class="stat-row" style="margin-top: 10px;">
+      <span class="stat-label" data-i18n="c5Avg">全系統平均功耗 (Avg Power)</span>
+      <span class="stat-val active" id="pwr-avg">0.00 μW</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label" data-i18n="c5Bat">預估手錶續航壽命 (200mAh)</span>
+      <span class="stat-val match" id="pwr-battery">-- 天</span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">
+    <span data-i18n="traceCardTitle">最近 CPU 指令追蹤歷史紀錄 (Instruction Execution Trace)</span>
+    <span style="font-size:12px; color:var(--text-secondary);" data-i18n="traceLast">Last 10 Instructions</span>
+  </div>
+  <table class="trace-table">
+    <thead>
+      <tr>
+        <th data-i18n="thPc">PC</th>
+        <th data-i18n="thDisasm">指令反彙編 (Disassembly)</th>
+        <th data-i18n="thCycles">時脈週期 (Cycles)</th>
+        <th data-i18n="thWrite">暫存器寫入 (Write-back)</th>
+        <th data-i18n="thStatus">狀態 (Status)</th>
+      </tr>
+    </thead>
+    <tbody id="trace-tbody">
+    </tbody>
+  </table>
+</div>
+
+<script>
+  const data = {summary_json};
+  const traces = {trace_json};
+
+  const I18N = {{
+    "zh-TW": {{
+      dashTitle: "Smartwatch SoC 系統全周期架構模擬器 (System Simulator Dashboard)",
+      headTitle: "Edge AI Smartwatch SoC 模擬器監控儀表板",
+      headSubtitle: "RISC-V 32-bit (PicoRV32) + AFE CIC + Hardware VAD + Level-2 KWS DS-CNN NPU",
+      clkBadge: "SYS CLK: 12.288 MHz",
+      sramBadge: "ON-CHIP SRAM: 16 KB",
+      c1Title: "SoC 狀態與板載除錯 LED",
+      c1Cycles: "系統運行週期 (Cycles)",
+      c1SimTime: "模擬物理時間 (Time)",
+      c1State: "當前狀態判定",
+      c2Title: "PicoRV32 RISC-V 處理器核心",
+      c2Pc: "程式計數器 (PC)",
+      c2Sleep: "休眠狀態 (WFI / waitirq)",
+      c2Irq: "中斷服務常式 (In ISR)",
+      c2Insts: "已執行指令總數",
+      c2Mask: "中斷遮罩 (IRQ Mask)",
+      c3Title: "音訊前端與硬體 VAD (第一級 Always-on)",
+      c3Fifo: "AFE 採樣 / FIFO 緩衝區",
+      c3Thres: "短時能量門檻 (Threshold)",
+      c3Ste: "當前幀短時能量 (STE Energy)",
+      c3Speech: "語音活動旗標 (Speech Active)",
+      c3Irq: "喚醒中斷訊號 (irq_vad_wakeup)",
+      c4Title: "KWS NPU 加速器 (第二級 DS-CNN INT8)",
+      c4Badge: "2.33 ms 推論",
+      c4State: "NPU 狀態機 (FSM State)",
+      c4Flags: "運算中標誌 (Busy / Done)",
+      c4Score0: "Class 0 得分 (背景雜音)",
+      c4Score1: "Class 1 得分 (目標喚醒詞)",
+      c4Verdict: "喚醒詞判定結果",
+      c5Title: "全晶片動態功耗與電池續航分析",
+      c5Badge: "200mAh 鋰聚合物",
+      c5Sleep: "待機休眠佔空比 (Sleep Duty)",
+      c5Cpu: "CPU 活躍比例 (Active)",
+      c5Npu: "NPU 推論比例 (Inference)",
+      c5Avg: "全系統平均功耗 (Avg Power)",
+      c5Bat: "預估手錶續航壽命 (200mAh)",
+      traceCardTitle: "最近 CPU 指令追蹤歷史紀錄 (Instruction Execution Trace)",
+      traceLast: "最近 10 條指令",
+      thPc: "PC",
+      thDisasm: "指令反彙編 (Disassembly)",
+      thCycles: "時脈週期 (Cycles)",
+      thWrite: "暫存器寫入 (Write-back)",
+      thStatus: "狀態 (Status)",
+      yesSleep: "是 (休眠中)",
+      noActive: "否 (運行中)",
+      yesIsr: "是 (執行中斷 ISR)",
+      no: "否",
+      voiceActive: "偵測到語音 🟢",
+      silence: "安靜無聲",
+      irqActive: "中斷觸發 (Active) ⚡",
+      irqInactive: "無中斷",
+      kwMatch: "喚醒詞命中 (Class 1) 🎯",
+      kwNo: "非關鍵詞 (Class 0)",
+      daysStr: (d, m) => `${{d}} 天 (${{m}} 個月)`
+    }},
+
+    "en": {{
+      dashTitle: "Smartwatch SoC System Simulator Dashboard",
+      headTitle: "Edge AI Smartwatch SoC Simulator Monitoring Dashboard",
+      headSubtitle: "RISC-V 32-bit (PicoRV32) + AFE CIC + Hardware VAD + Level-2 KWS DS-CNN NPU",
+      clkBadge: "SYS CLK: 12.288 MHz",
+      sramBadge: "ON-CHIP SRAM: 16 KB",
+      c1Title: "SoC Status & On-board Debug LEDs",
+      c1Cycles: "Total Clock Cycles",
+      c1SimTime: "Simulated Time",
+      c1State: "Current State Verdict",
+      c2Title: "PicoRV32 RISC-V Processor Core",
+      c2Pc: "Program Counter (PC)",
+      c2Sleep: "Sleep State (WFI / waitirq)",
+      c2Irq: "In ISR Handler",
+      c2Insts: "Total Instructions Executed",
+      c2Mask: "IRQ Mask",
+      c3Title: "Audio Front-End & Hardware VAD (Stage 1)",
+      c3Fifo: "AFE Sample FIFO Buffer",
+      c3Thres: "Short-Time Energy Threshold",
+      c3Ste: "Current STE Energy",
+      c3Speech: "Voice Activity Flag",
+      c3Irq: "Wakeup IRQ Signal (irq_vad_wakeup)",
+      c4Title: "KWS NPU Accelerator (Stage 2 DS-CNN INT8)",
+      c4Badge: "2.33 ms Inference",
+      c4State: "NPU FSM State",
+      c4Flags: "Busy / Done Flags",
+      c4Score0: "Class 0 Score (Noise / Non-KW)",
+      c4Score1: "Class 1 Score (Target Keyword)",
+      c4Verdict: "Keyword Detection Verdict",
+      c5Title: "Full-Chip Dynamic Power & Battery Life",
+      c5Badge: "200mAh Li-Po",
+      c5Sleep: "Standby Sleep Duty Cycle",
+      c5Cpu: "CPU Active Ratio",
+      c5Npu: "NPU Inference Ratio",
+      c5Avg: "Average System Power",
+      c5Bat: "Projected Battery Life (200mAh)",
+      traceCardTitle: "Recent CPU Instruction Execution Trace",
+      traceLast: "Last 10 Instructions",
+      thPc: "PC",
+      thDisasm: "Disassembly",
+      thCycles: "Cycles",
+      thWrite: "Write-back",
+      thStatus: "Status",
+      yesSleep: "YES (Sleeping)",
+      noActive: "NO (Active)",
+      yesIsr: "YES (Serving ISR)",
+      no: "NO",
+      voiceActive: "Voice Active 🟢",
+      silence: "Silence",
+      irqActive: "ACTIVE (Wakeup IRQ) ⚡",
+      irqInactive: "Inactive",
+      kwMatch: "MATCHED (Class 1) 🎯",
+      kwNo: "NO (Class 0)",
+      daysStr: (d, m) => `${{d}} Days (${{m}} Months)`
+    }},
+
+    "zh-CN": {{
+      dashTitle: "Smartwatch SoC 系统全周期架构模拟器 (System Simulator Dashboard)",
+      headTitle: "Edge AI Smartwatch SoC 模拟器监控仪表板",
+      headSubtitle: "RISC-V 32-bit (PicoRV32) + AFE CIC + Hardware VAD + Level-2 KWS DS-CNN NPU",
+      clkBadge: "SYS CLK: 12.288 MHz",
+      sramBadge: "ON-CHIP SRAM: 16 KB",
+      c1Title: "SoC 状态与板载调试 LED",
+      c1Cycles: "系统运行周期 (Cycles)",
+      c1SimTime: "模拟物理时间 (Time)",
+      c1State: "当前状态判定",
+      c2Title: "PicoRV32 RISC-V 处理器核心",
+      c2Pc: "程序计数器 (PC)",
+      c2Sleep: "休眠状态 (WFI / waitirq)",
+      c2Irq: "中断服务例程 (In ISR)",
+      c2Insts: "已执行指令总数",
+      c2Mask: "中断屏蔽 (IRQ Mask)",
+      c3Title: "音频前端与硬件 VAD (第一级 Always-on)",
+      c3Fifo: "AFE 采样 / FIFO 缓冲区",
+      c3Thres: "短时能量门限 (Threshold)",
+      c3Ste: "当前帧短时能量 (STE Energy)",
+      c3Speech: "语音活动标志 (Speech Active)",
+      c3Irq: "唤醒中断信号 (irq_vad_wakeup)",
+      c4Title: "KWS NPU 加速器 (第二级 DS-CNN INT8)",
+      c4Badge: "2.33 ms 推理",
+      c4State: "NPU 状态机 (FSM State)",
+      c4Flags: "计算中标志 (Busy / Done)",
+      c4Score0: "Class 0 得分 (背景噪声)",
+      c4Score1: "Class 1 得分 (目标唤醒词)",
+      c4Verdict: "唤醒词判定结果",
+      c5Title: "全芯片动态功耗与电池续航分析",
+      c5Badge: "200mAh 锂聚合物",
+      c5Sleep: "待机休眠占空比 (Sleep Duty)",
+      c5Cpu: "CPU 活跃比例 (Active)",
+      c5Npu: "NPU 推理比例 (Inference)",
+      c5Avg: "全系统平均功耗 (Avg Power)",
+      c5Bat: "预估手表续航寿命 (200mAh)",
+      traceCardTitle: "最近 CPU 指令追踪历史记录 (Instruction Execution Trace)",
+      traceLast: "最近 10 条指令",
+      thPc: "PC",
+      thDisasm: "指令反汇编 (Disassembly)",
+      thCycles: "时钟周期 (Cycles)",
+      thWrite: "寄存器写回 (Write-back)",
+      thStatus: "状态 (Status)",
+      yesSleep: "是 (休眠中)",
+      noActive: "否 (运行中)",
+      yesIsr: "是 (执行中断 ISR)",
+      no: "否",
+      voiceActive: "检测到语音 🟢",
+      silence: "安静无声",
+      irqActive: "中断触发 (Active) ⚡",
+      irqInactive: "无中断",
+      kwMatch: "唤醒词命中 (Class 1) 🎯",
+      kwNo: "非关键词 (Class 0)",
+      daysStr: (d, m) => `${{d}} 天 (${{m}} 个月)`
+    }},
+
+    "ja": {{
+      dashTitle: "Smartwatch SoC システムシミュレータダッシュボード",
+      headTitle: "Edge AI Smartwatch SoC シミュレータ監視ダッシュボード",
+      headSubtitle: "RISC-V 32-bit (PicoRV32) + AFE CIC + Hardware VAD + Level-2 KWS DS-CNN NPU",
+      clkBadge: "SYS CLK: 12.288 MHz",
+      sramBadge: "ON-CHIP SRAM: 16 KB",
+      c1Title: "SoC 状態 & オンボードデバッグ LED",
+      c1Cycles: "総実行サイクル (Cycles)",
+      c1SimTime: "シミュレーション時間 (Time)",
+      c1State: "現在状態判定",
+      c2Title: "PicoRV32 RISC-V プロセッサコア",
+      c2Pc: "プログラムカウンタ (PC)",
+      c2Sleep: "スリープ状態 (WFI / waitirq)",
+      c2Irq: "割込み処理中 (In ISR)",
+      c2Insts: "総実行命令数",
+      c2Mask: "割込みマスク (IRQ Mask)",
+      c3Title: "オーディオフロントエンド & HW VAD (第1段)",
+      c3Fifo: "AFE サンプル FIFO バッファ",
+      c3Thres: "短時間エネルギー閾値",
+      c3Ste: "現在 STE エネルギー",
+      c3Speech: "音声アクティビティフラグ",
+      c3Irq: "ウェイクアップ割込み (irq_vad_wakeup)",
+      c4Title: "KWS NPU アクセラレータ (第2段 DS-CNN INT8)",
+      c4Badge: "2.33 ms 推論",
+      c4State: "NPU 状態遷移 (FSM State)",
+      c4Flags: "Busy / Done フラグ",
+      c4Score0: "Class 0 スコア (背景ノイズ)",
+      c4Score1: "Class 1 スコア (ターゲットKW)",
+      c4Verdict: "キーワード判定結果",
+      c5Title: "チップ動的消費電力 & バッテリー分析",
+      c5Badge: "200mAh リチウムポリマー",
+      c5Sleep: "待機スリープデューティ比",
+      c5Cpu: "CPU 稼働率",
+      c5Npu: "NPU 推論率",
+      c5Avg: "全システム平均消費電力",
+      c5Bat: "推定バッテリー駆動時間 (200mAh)",
+      traceCardTitle: "CPU 命令実行トレース履歴",
+      traceLast: "直近 10 命令",
+      thPc: "PC",
+      thDisasm: "逆アセンブル (Disassembly)",
+      thCycles: "クロックサイクル",
+      thWrite: "レジスタ書込",
+      thStatus: "状態 (Status)",
+      yesSleep: "はい (スリープ中)",
+      noActive: "いいえ (稼働中)",
+      yesIsr: "はい (ISR 処理中)",
+      no: "いいえ",
+      voiceActive: "音声検出中 🟢",
+      silence: "無音状態",
+      irqActive: "割込み発生中 ⚡",
+      irqInactive: "割込みなし",
+      kwMatch: "キーワード一致 (Class 1) 🎯",
+      kwNo: "非キーワード (Class 0)",
+      daysStr: (d, m) => `${{d}} 日 (${{m}} ヶ月)`
+    }}
+  }};
+
+  let currentLang = localStorage.getItem("smartwatch_dash_lang") || "{default_lang}";
+  if (!I18N[currentLang]) currentLang = "zh-TW";
+
+  function dt(key) {{
+    const dict = I18N[currentLang] || I18N["zh-TW"];
+    return dict[key] || (I18N["zh-TW"][key] || key);
+  }}
+
+  function changeLanguage(lang) {{
+    if (!I18N[lang]) lang = "zh-TW";
+    currentLang = lang;
+    localStorage.setItem("smartwatch_dash_lang", lang);
+    document.documentElement.lang = lang;
+
+    const sel = document.getElementById("lang-select");
+    if (sel && sel.value !== lang) sel.value = lang;
+
+    document.querySelectorAll("[data-i18n]").forEach(elem => {{
+      const key = elem.getAttribute("data-i18n");
+      const val = dt(key);
+      if (typeof val === "string") {{
+        if (elem.tagName === "TITLE") {{
+          document.title = val;
+        }} else {{
+          elem.innerText = val;
+        }}
+      }}
+    }});
+
+    updateUI();
+  }}
+
+  function updateUI() {{
+    // Overview
+    document.getElementById("total-cycles").innerText = data.total_cycles.toLocaleString();
+    document.getElementById("sim-time").innerText = data.sim_time_ms.toFixed(2) + " ms";
+    document.getElementById("led-hex").innerText = data.leds.val;
+    document.getElementById("led-desc").innerText = data.leds.desc;
+
+    // LEDs
+    const val = parseInt(data.leds.val, 16);
+    const ledArr = document.getElementById("led-array");
+    ledArr.innerHTML = "";
+    for (let b = 7; b >= 0; b--) {{
+      const d = document.createElement("div");
+      d.className = "led-lamp" + ((val & (1 << b)) ? (val === 0xAA ? " on" : " on-amber") : "");
+      d.innerText = b;
+      ledArr.appendChild(d);
+    }}
+
+    // CPU
+    document.getElementById("cpu-pc").innerText = data.cpu.pc;
+    document.getElementById("cpu-sleep").innerText = data.cpu.sleeping ? dt("yesSleep") : dt("noActive");
+    document.getElementById("cpu-irq").innerText = data.cpu.in_irq ? dt("yesIsr") : dt("no");
+    document.getElementById("cpu-insts").innerText = data.cpu.instruction_count.toLocaleString();
+    document.getElementById("cpu-mask").innerText = data.cpu.irq_mask;
+
+    // AFE / VAD
+    document.getElementById("afe-fifo").innerText = data.afe.fifo_count + " / 256 samples";
+    document.getElementById("vad-thres").innerText = data.vad.threshold.toLocaleString();
+    document.getElementById("vad-energy").innerText = data.vad.current_energy.toLocaleString();
+    const pct = Math.min(100, (data.vad.current_energy / (data.vad.threshold * 1.5)) * 100);
+    document.getElementById("vad-energy-bar").style.width = pct + "%";
+    document.getElementById("vad-active").innerText = data.vad.speech_active ? dt("voiceActive") : dt("silence");
+    document.getElementById("vad-irq").innerText = data.vad.irq_pending ? dt("irqActive") : dt("irqInactive");
+
+    // NPU
+    document.getElementById("npu-state").innerText = data.npu.state;
+    document.getElementById("npu-flags").innerText = data.npu.busy ? "BUSY" : (data.npu.done ? "DONE" : "IDLE");
+    document.getElementById("score-0").innerText = data.npu.score_0;
+    document.getElementById("score-1").innerText = data.npu.score_1;
+    const kwElem = document.getElementById("kw-detected");
+    kwElem.innerText = data.npu.keyword_detected ? dt("kwMatch") : dt("kwNo");
+    kwElem.className = data.npu.keyword_detected ? "stat-val match" : "stat-val";
+
+    // Power
+    document.getElementById("pwr-sleep-pct").innerText = data.power.sleep_pct.toFixed(1) + " %";
+    document.getElementById("pwr-sleep-bar").style.width = data.power.sleep_pct + "%";
+    document.getElementById("pwr-cpu-pct").innerText = data.power.cpu_active_pct.toFixed(1) + " %";
+    document.getElementById("pwr-npu-pct").innerText = data.power.npu_active_pct.toFixed(1) + " %";
+    document.getElementById("pwr-avg").innerText = data.power.average_power_uw.toFixed(1) + " μW";
+    
+    const dStr = data.power.battery_life_days.toFixed(1);
+    const mStr = (data.power.battery_life_days / 30.4).toFixed(1);
+    const daysFunc = I18N[currentLang].daysStr || I18N["zh-TW"].daysStr;
+    document.getElementById("pwr-battery").innerText = daysFunc(dStr, mStr);
+
+    // Traces
+    const tbody = document.getElementById("trace-tbody");
+    tbody.innerHTML = "";
+    const recent = traces.slice(-10);
+    for (const t of recent) {{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td style="color:var(--accent-blue);">0x${{(t.pc || 0).toString(16).padStart(8, '0')}}</td>
+        <td>${{t.disasm || ""}}</td>
+        <td>${{t.cycles || 1}}</td>
+        <td style="color:var(--accent-green);">${{t.reg_write ? "x" + t.reg_write[0] + " = 0x" + t.reg_write[1].toString(16) : "-"}}</td>
+        <td>${{t.sleeping ? "<span style='color:var(--accent-amber);'>[Sleep]</span>" : (t.is_irq ? "<span style='color:var(--accent-purple);'>[IRQ]</span>" : "OK")}}</td>
+      `;
+      tbody.appendChild(tr);
+    }}
+  }}
+
+  // Initialize
+  changeLanguage(currentLang);
+</script>
+</body>
+</html>
+"""
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+    print(f"[Dashboard Generator] Generated multi-language interactive SoC dashboard -> {output_path}")

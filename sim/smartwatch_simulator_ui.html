@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n="pageTitle">Smartwatch SoC 視覺化互動模擬器 (Interactive GUI)</title>
+<script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+<style>
+  :root {
+    --bg-dark: #090d16;
+    --card-bg: #111827;
+    --border: #1f2937;
+    --text-primary: #f9fafb;
+    --text-muted: #9ca3af;
+    --accent: #38bdf8;
+  }
+  body { background: var(--bg-dark); color: var(--text-primary); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  .watch-frame {
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    border: 10px solid #374151;
+    box-shadow: 0 0 25px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.9);
+    position: relative;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .led-glow-green { box-shadow: 0 0 14px #22c55e, inset 0 0 4px #86efac; }
+  .led-glow-amber { box-shadow: 0 0 14px #f59e0b, inset 0 0 4px #fde68a; }
+</style>
+</head>
+<body class="p-6">
+
+<div class="max-w-7xl mx-auto space-y-6">
+  <!-- Top Header -->
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 border-b border-gray-800 gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-sky-400 flex items-center gap-2">
+        <span>⌚</span> <span data-i18n="headerTitle">Edge AI 智慧手錶 SoC 視覺化互動模擬器</span>
+      </h1>
+      <p class="text-sm text-gray-400 mt-1" data-i18n="headerSubtitle">
+        32-bit RISC-V (PicoRV32) + AFE CIC + Hardware VAD + Level-2 KWS DS-CNN NPU
+      </p>
+    </div>
+    
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- Language Selector -->
+      <div class="flex items-center gap-2 bg-gray-900 border border-gray-700 px-3 py-1.5 rounded-full shadow-inner">
+        <span class="text-xs text-sky-400 font-bold">🌐</span>
+        <label for="lang-select" class="sr-only">Language</label>
+        <select id="lang-select" onchange="changeLanguage(this.value)" class="bg-transparent text-gray-200 text-xs font-semibold focus:outline-none cursor-pointer">
+          <option value="zh-TW" class="bg-gray-900 text-gray-100">繁體中文 (Traditional Chinese)</option>
+          <option value="en" class="bg-gray-900 text-gray-100">English (英文)</option>
+          <option value="zh-CN" class="bg-gray-900 text-gray-100">简体中文 (Simplified Chinese)</option>
+          <option value="ja" class="bg-gray-900 text-gray-100">日本語 (Japanese)</option>
+        </select>
+      </div>
+
+      <span id="backend-badge" class="px-3 py-1 bg-gray-800 text-gray-300 border border-gray-700 rounded-full text-xs font-semibold">
+        檢查硬體後端...
+      </span>
+      <span class="px-3 py-1 bg-sky-950 text-sky-300 border border-sky-800 rounded-full text-xs font-semibold" data-i18n="clockBadge">
+        時脈: 12.288 MHz
+      </span>
+      <span class="px-3 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-full text-xs font-semibold" data-i18n="standbyBadge">
+        待機: &lt; 20 μW
+      </span>
+      <span class="px-3 py-1 bg-purple-950 text-purple-300 border border-purple-800 rounded-full text-xs font-semibold" data-i18n="sramBadge">
+        SRAM: 16 KB
+      </span>
+    </div>
+  </div>
+
+  <!-- Control Toolbar -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-2">
+      <button id="btn-play" onclick="togglePlay()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold text-sm transition flex items-center gap-1.5 shadow">
+        <span id="play-icon">▶</span> <span id="play-text" data-i18n="btnRun">連續運行 (Run)</span>
+      </button>
+      <button onclick="stepSim(1)" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-sm transition border border-gray-700 flex items-center gap-1">
+        <span>⏭️</span> <span data-i18n="btnStep">單步執行 (Step)</span>
+      </button>
+      <button onclick="stepSim(50)" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-sm transition border border-gray-700 flex items-center gap-1">
+        <span>⏩</span> <span data-i18n="btnStep50">快進 50 步</span>
+      </button>
+      <button onclick="resetSim()" class="px-3 py-2 bg-rose-950 hover:bg-rose-900 text-rose-300 rounded-lg text-sm transition border border-rose-800 flex items-center gap-1">
+        <span>🔄</span> <span data-i18n="btnReset">重設 (Reset)</span>
+      </button>
+    </div>
+
+    <!-- Audio Stimulus Injection -->
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-gray-400 font-medium" data-i18n="micInject">麥克風注入:</span>
+      <button onclick="injectAudio('speech')" class="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-emerald-100 rounded-md text-xs font-semibold transition shadow flex items-center gap-1">
+        <span>🗣️</span> <span data-i18n="btnSpeech">語音串流 (Speech)</span>
+      </button>
+      <button onclick="injectAudio('silence')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-md text-xs transition border border-gray-700 flex items-center gap-1">
+        <span>🤫</span> <span data-i18n="btnSilence">無聲環境 (Silence)</span>
+      </button>
+      <button onclick="injectAudio('tone')" class="px-3 py-1.5 bg-amber-950 hover:bg-amber-900 text-amber-200 rounded-md text-xs transition border border-amber-800 flex items-center gap-1">
+        <span>📻</span> <span data-i18n="btnNoise">雜音/非關鍵詞</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Display Grid -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Left Column: Smartwatch Hardware & LEDs -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col items-center justify-between">
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 w-full text-left" data-i18n="watchTitle">
+        智慧手錶硬體外觀與螢幕 (Watch Display)
+      </h2>
+      
+      <!-- Smartwatch Mockup -->
+      <div class="watch-frame my-4" id="watch-screen">
+        <div id="screen-content" class="text-center p-4">
+          <div class="text-xs text-gray-500 uppercase tracking-widest mb-1" id="watch-mode">STANDBY</div>
+          <div class="text-3xl font-extrabold text-gray-300 tracking-tight" id="watch-time">10:09</div>
+          <div class="text-[11px] text-emerald-400 mt-2 font-medium" id="watch-status">待機休眠中 (&lt; 20μW)</div>
+          <div class="mt-4 flex items-center justify-center gap-1.5 text-xs text-gray-400">
+            <span>🔋</span> <span id="watch-battery">100% (續航 10.3天)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8-Bit Debug LEDs -->
+      <div class="w-full mt-4 pt-4 border-t border-gray-800">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-xs text-gray-400 font-semibold" data-i18n="ledTitle">板載除錯 LED (0x8000_0000)</span>
+          <span class="text-xs font-mono text-amber-400" id="led-hex">0x00</span>
+        </div>
+        <div class="flex justify-between items-center bg-gray-950 p-2.5 rounded-lg border border-gray-800" id="led-container">
+          <!-- 8 LEDs generated by JS -->
+        </div>
+        <div class="text-[11px] text-gray-400 text-center mt-2" id="led-meaning">
+          系統未啟動
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Column: VAD & NPU Subsystems -->
+    <div class="space-y-6">
+      
+      <!-- AFE & VAD Subsystem -->
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
+        <div class="flex justify-between items-center">
+          <h2 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider" data-i18n="afeVadTitle">
+            第一級：音訊前端 (AFE) 與硬體 VAD
+          </h2>
+          <span class="text-xs px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded">
+            Always-on
+          </span>
+        </div>
+
+        <div>
+          <div class="flex justify-between text-xs text-gray-300 mb-1">
+            <span data-i18n="steEnergy">短時絕對值能量 (STE Energy)</span>
+            <span id="vad-energy-val" class="font-bold text-sky-400">0</span>
+          </div>
+          <div class="h-3 bg-gray-800 rounded-full overflow-hidden relative border border-gray-700">
+            <div id="vad-energy-bar" class="h-full bg-emerald-500 transition-all duration-150" style="width: 0%;"></div>
+            <div class="absolute top-0 bottom-0 w-0.5 bg-rose-500" style="left: 60%;" title="Threshold: 200,000"></div>
+          </div>
+          <div class="flex justify-between text-[10px] text-gray-500 mt-1">
+            <span>0</span>
+            <span class="text-rose-400 font-medium" data-i18n="vadThresholdLabel">門檻: 200,000</span>
+            <span>350,000</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 text-xs bg-gray-950 p-3 rounded-lg border border-gray-800">
+          <div>
+            <span class="text-gray-500 block" data-i18n="vadSpeechFlagLabel">語音活動旗標:</span>
+            <span id="vad-speech-flag" class="font-bold text-gray-400">無語音 (Silence)</span>
+          </div>
+          <div>
+            <span class="text-gray-500 block" data-i18n="vadIrqFlagLabel">喚醒中斷訊號:</span>
+            <span id="vad-irq-flag" class="font-bold text-gray-400">無中斷</span>
+          </div>
+          <div>
+            <span class="text-gray-500 block" data-i18n="afeFifoLabel">AFE 採樣 FIFO:</span>
+            <span id="afe-fifo-count" class="font-mono text-gray-300">0 / 256 words</span>
+          </div>
+          <div>
+            <span class="text-gray-500 block" data-i18n="vadHangoverLabel">Hangover 防抖計數:</span>
+            <span id="vad-hangover-val" class="font-mono text-gray-300">0 幀</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KWS NPU Accelerator -->
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
+        <div class="flex justify-between items-center">
+          <h2 class="text-sm font-semibold text-purple-400 uppercase tracking-wider" data-i18n="npuTitle">
+            第二級：KWS NPU 加速器 (DS-CNN INT8)
+          </h2>
+          <span class="text-xs px-2 py-0.5 bg-purple-950 text-purple-300 border border-purple-800 rounded" data-i18n="npuBadge">
+            2.33 ms 推論
+          </span>
+        </div>
+
+        <!-- FSM Progress Pipeline -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between text-xs text-gray-300">
+            <span data-i18n="npuFsmTitle">硬體狀態機 (FSM State)</span>
+            <span id="npu-state-text" class="font-bold text-purple-400">IDLE</span>
+          </div>
+          <div class="grid grid-cols-6 gap-1 text-[10px] text-center font-bold">
+            <div id="fsm-conv1" class="py-1 bg-gray-800 text-gray-500 rounded">CONV1</div>
+            <div id="fsm-dw" class="py-1 bg-gray-800 text-gray-500 rounded">DW</div>
+            <div id="fsm-pw" class="py-1 bg-gray-800 text-gray-500 rounded">PW</div>
+            <div id="fsm-gap" class="py-1 bg-gray-800 text-gray-500 rounded">GAP</div>
+            <div id="fsm-fc" class="py-1 bg-gray-800 text-gray-500 rounded">FC</div>
+            <div id="fsm-done" class="py-1 bg-gray-800 text-gray-500 rounded">DONE</div>
+          </div>
+        </div>
+
+        <!-- Classification Scores -->
+        <div class="space-y-2 bg-gray-950 p-3 rounded-lg border border-gray-800 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400" data-i18n="scoreClass0">Class 0 (雜音/非關鍵詞):</span>
+            <span id="score-class-0" class="font-mono font-bold text-gray-300">0</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400" data-i18n="scoreClass1">Class 1 (目標喚醒詞):</span>
+            <span id="score-class-1" class="font-mono font-bold text-emerald-400">0</span>
+          </div>
+          <div class="pt-2 border-t border-gray-800 flex justify-between items-center">
+            <span class="text-gray-400" data-i18n="npuVerdictTitle">喚醒詞偵測結果:</span>
+            <span id="npu-verdict" class="font-bold px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400">
+              等待推論...
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: RISC-V CPU Core & Power Profiler -->
+    <div class="space-y-6">
+      
+      <!-- CPU Subsystem -->
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
+        <div class="flex justify-between items-center">
+          <h2 class="text-sm font-semibold text-sky-400 uppercase tracking-wider" data-i18n="cpuTitle">
+            32-bit RISC-V 處理器核心 (PicoRV32)
+          </h2>
+          <span id="cpu-sleep-badge" class="text-xs px-2 py-0.5 bg-gray-800 text-gray-400 rounded">
+            Running
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 text-xs bg-gray-950 p-3 rounded-lg border border-gray-800">
+          <div>
+            <span class="text-gray-500 block" data-i18n="cpuPc">程式計數器 (PC):</span>
+            <span id="cpu-pc-val" class="font-mono font-bold text-sky-400">0x00000000</span>
+          </div>
+          <div>
+            <span class="text-gray-500 block" data-i18n="cpuIrq">中斷狀態 (ISR):</span>
+            <span id="cpu-irq-status" class="font-mono text-gray-300">Normal</span>
+          </div>
+          <div>
+            <span class="text-gray-500 block" data-i18n="cpuCycles">時脈週期數:</span>
+            <span id="sys-cycles" class="font-mono text-gray-300">0</span>
+          </div>
+          <div>
+            <span class="text-gray-500 block" data-i18n="cpuInsts">已執行指令數:</span>
+            <span id="sys-inst-count" class="font-mono text-gray-300">0</span>
+          </div>
+        </div>
+
+        <!-- Key Registers -->
+        <div>
+          <span class="text-xs text-gray-400 font-semibold block mb-1.5" data-i18n="coreRegs">核心暫存器快照</span>
+          <div class="grid grid-cols-4 gap-1.5 text-[11px] font-mono text-center">
+            <div class="bg-gray-950 p-1.5 rounded border border-gray-800"><span class="text-gray-500">sp:</span><span id="reg-sp" class="text-sky-300 block truncate">0x0</span></div>
+            <div class="bg-gray-950 p-1.5 rounded border border-gray-800"><span class="text-gray-500">s0:</span><span id="reg-s0" class="text-sky-300 block truncate">0x0</span></div>
+            <div class="bg-gray-950 p-1.5 rounded border border-gray-800"><span class="text-gray-500">s1:</span><span id="reg-s1" class="text-sky-300 block truncate">0x0</span></div>
+            <div class="bg-gray-950 p-1.5 rounded border border-gray-800"><span class="text-gray-500">t0:</span><span id="reg-t0" class="text-sky-300 block truncate">0x0</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Power & Battery Profiler -->
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
+        <h2 class="text-sm font-semibold text-amber-400 uppercase tracking-wider" data-i18n="powerTitle">
+          動態功耗與電池壽命分析
+        </h2>
+
+        <div class="space-y-2 text-xs">
+          <div>
+            <div class="flex justify-between text-gray-400 mb-1">
+              <span data-i18n="dutyCycle">休眠佔空比 (Duty Cycle)</span>
+              <span id="duty-pct" class="font-bold text-sky-400">0.0 %</span>
+            </div>
+            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div id="duty-bar" class="h-full bg-sky-500" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 pt-2">
+            <div class="bg-gray-950 p-2.5 rounded-lg border border-gray-800">
+              <span class="text-[11px] text-gray-500 block" data-i18n="avgPower">全系統平均功耗:</span>
+              <span id="avg-power" class="text-sm font-bold text-emerald-400">18.5 μW</span>
+            </div>
+            <div class="bg-gray-950 p-2.5 rounded-lg border border-gray-800">
+              <span class="text-[11px] text-gray-500 block" data-i18n="totalEnergy">累計耗能 (Energy):</span>
+              <span id="total-energy" class="text-sm font-bold text-gray-200">0.0 μJ</span>
+            </div>
+          </div>
+
+          <div class="bg-emerald-950/40 border border-emerald-800/60 p-3 rounded-lg text-emerald-300 text-xs">
+            <div class="font-bold flex items-center justify-between">
+              <span data-i18n="estBattery">🔋 預估手錶續航力:</span>
+              <span id="est-days" class="text-white text-sm font-extrabold">10.3 天</span>
+            </div>
+            <div class="text-[11px] text-emerald-400/80 mt-1" data-i18n="batteryNote">
+              基於 200 mAh 鋰聚合物電池 (0.74 Wh) 計算
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Instruction Execution Log Table -->
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider" data-i18n="traceTitle">
+        即時指令執行反彙編日誌 (Instruction Trace)
+      </h2>
+      <span class="text-xs text-gray-500" data-i18n="traceSubtitle">最近 6 條執行記錄</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs font-mono text-left">
+        <thead>
+          <tr class="text-gray-500 border-b border-gray-800">
+            <th class="py-2 px-3" data-i18n="thPc">PC</th>
+            <th class="py-2 px-3" data-i18n="thDisasm">指令反彙編 (Disassembly)</th>
+            <th class="py-2 px-3" data-i18n="thCycles">週期</th>
+            <th class="py-2 px-3" data-i18n="thWriteback">暫存器寫入 (Writeback)</th>
+            <th class="py-2 px-3" data-i18n="thStatus">系統狀態</th>
+          </tr>
+        </thead>
+        <tbody id="trace-tbody">
+          <!-- Rows inserted by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Complete Multi-Language (i18n) Dictionary
+  const I18N = {
+    "zh-TW": {
+      pageTitle: "Smartwatch SoC 視覺化互動模擬器 (Interactive GUI)",
+      headerTitle: "Edge AI 智慧手錶 SoC 視覺化互動模擬器",
+      headerSubtitle: "32-bit RISC-V (PicoRV32) + AFE CIC + Hardware VAD + Level-2 KWS DS-CNN NPU",
+      clockBadge: "時脈: 12.288 MHz",
+      standbyBadge: "待機: < 20 μW",
+      sramBadge: "SRAM: 16 KB",
+      backendChecking: "檢查硬體後端...",
+      backendConnected: "🟢 後端連線: Python 週期精確硬體核心",
+      backendDemo: "🟡 瀏覽器展示模式 (執行 web_server.py 連線實體模擬)",
+      btnRun: "連續運行 (Run)",
+      btnPause: "暫停 (Pause)",
+      btnStep: "單步執行 (Step)",
+      btnStep50: "快進 50 步",
+      btnReset: "重設 (Reset)",
+      micInject: "麥克風注入:",
+      btnSpeech: "語音串流 (Speech)",
+      btnSilence: "無聲環境 (Silence)",
+      btnNoise: "雜音/非關鍵詞",
+      watchTitle: "智慧手錶硬體外觀與螢幕 (Watch Display)",
+      watchBattery: (d) => `100% (續航 ${d}天)`,
+      ledTitle: "板載除錯 LED (0x8000_0000)",
+      afeVadTitle: "第一級：音訊前端 (AFE) 與硬體 VAD",
+      steEnergy: "短時絕對值能量 (STE Energy)",
+      vadThresholdLabel: "門檻: 200,000",
+      vadSpeechFlagLabel: "語音活動旗標:",
+      vadSpeechActive: "偵測到語音 (Active) 🟢",
+      vadSpeechSilence: "安靜無聲 (Silence)",
+      vadIrqFlagLabel: "喚醒中斷訊號:",
+      vadIrqFired: "中斷觸發 (HIGH) ⚡",
+      vadIrqLow: "無中斷 (LOW)",
+      afeFifoLabel: "AFE 採樣 FIFO:",
+      vadHangoverLabel: "Hangover 防抖計數:",
+      framesUnit: "幀",
+      npuTitle: "第二級：KWS NPU 加速器 (DS-CNN INT8)",
+      npuBadge: "2.33 ms 推論",
+      npuFsmTitle: "硬體狀態機 (FSM State)",
+      scoreClass0: "Class 0 (雜音/非關鍵詞):",
+      scoreClass1: "Class 1 (目標喚醒詞):",
+      npuVerdictTitle: "喚醒詞偵測結果:",
+      npuVerdictWaiting: "等待推論...",
+      npuVerdictMatch: "喚醒詞命中 (Class 1) 🎯",
+      npuVerdictNonKw: "非關鍵詞 (Class 0)",
+      npuVerdictBusy: "DS-CNN 推論計算中...",
+      cpuTitle: "32-bit RISC-V 處理器核心 (PicoRV32)",
+      cpuRunning: "CPU Active (1.25mW)",
+      cpuSleeping: "WFI Sleeping (<20μW)",
+      cpuPc: "程式計數器 (PC):",
+      cpuIrq: "中斷狀態 (ISR):",
+      cpuCycles: "時脈週期數:",
+      cpuInsts: "已執行指令數:",
+      coreRegs: "核心暫存器快照",
+      powerTitle: "動態功耗與電池壽命分析",
+      dutyCycle: "休眠佔空比 (Duty Cycle)",
+      avgPower: "全系統平均功耗:",
+      totalEnergy: "累計耗能 (Energy):",
+      estBattery: "🔋 預估手錶續航力:",
+      daysUnit: "天",
+      batteryNote: "基於 200 mAh 鋰聚合物電池 (0.74 Wh) 計算",
+      traceTitle: "即時指令執行反彙編日誌 (Instruction Trace)",
+      traceSubtitle: "最近 6 條執行記錄",
+      thPc: "PC",
+      thDisasm: "指令反彙編 (Disassembly)",
+      thCycles: "週期",
+      thWriteback: "暫存器寫入 (Writeback)",
+      thStatus: "系統狀態",
+      
+      // Dynamic LED & Watch Screen interpretations
+      led00: "系統未啟動",
+      led01: "0x01: 系統上電開機中 (Booting)",
+      led02: "0x02: 周邊初始化完成 (System Ready)",
+      led04: "0x04: 深度待機休眠模式 (WFI Sleep <20μW)",
+      led08: "0x08: 偵測到人類聲音！啟動 NPU 推論",
+      ledAA: "0xAA: 喚醒詞命中！點亮手錶主螢幕 (MATCH 🎯)",
+      led55: "0x55: 非目標喚醒詞，返回低功耗休眠",
+      
+      statusBooting: "SoC Booting...",
+      statusReady: "硬體已就緒",
+      statusStandby: "待機休眠中 (< 20μW)",
+      statusVoice: "語音喚醒中... 運算中",
+      statusMatch: "🎯 關鍵詞命中！螢幕全亮",
+      statusNonKw: "非喚醒詞 -> 返還休眠"
+    },
+
+    "en": {
+      pageTitle: "Smartwatch SoC Interactive Simulator (GUI)",
+      headerTitle: "Edge AI Smartwatch SoC Interactive Simulator",
+      headerSubtitle: "32-bit RISC-V (PicoRV32) + AFE CIC + Hardware VAD + Level-2 KWS DS-CNN NPU",
+      clockBadge: "Clock: 12.288 MHz",
+      standbyBadge: "Standby: < 20 μW",
+      sramBadge: "SRAM: 16 KB",
+      backendChecking: "Checking backend...",
+      backendConnected: "🟢 Connected: Python Cycle-Accurate Hardware Engine",
+      backendDemo: "🟡 Browser Demo Mode (Run web_server.py to connect hardware engine)",
+      btnRun: "Run",
+      btnPause: "Pause",
+      btnStep: "Step",
+      btnStep50: "Fast Forward 50",
+      btnReset: "Reset",
+      micInject: "Mic Input:",
+      btnSpeech: "Speech Stream",
+      btnSilence: "Silence",
+      btnNoise: "Noise / Non-KW",
+      watchTitle: "Smartwatch Display & Appearance",
+      watchBattery: (d) => `100% (Est. ${d} Days)`,
+      ledTitle: "On-board Debug LEDs (0x8000_0000)",
+      afeVadTitle: "Stage 1: Audio Front-End (AFE) & Hardware VAD",
+      steEnergy: "Short-Time Energy (STE)",
+      vadThresholdLabel: "Threshold: 200,000",
+      vadSpeechFlagLabel: "Voice Activity:",
+      vadSpeechActive: "Voice Detected (Active) 🟢",
+      vadSpeechSilence: "Quiet (Silence)",
+      vadIrqFlagLabel: "Wakeup IRQ Signal:",
+      vadIrqFired: "IRQ Fired (HIGH) ⚡",
+      vadIrqLow: "No IRQ (LOW)",
+      afeFifoLabel: "AFE Sample FIFO:",
+      vadHangoverLabel: "Hangover Debounce:",
+      framesUnit: "frames",
+      npuTitle: "Stage 2: KWS NPU Accelerator (DS-CNN INT8)",
+      npuBadge: "2.33 ms Inference",
+      npuFsmTitle: "Hardware FSM State",
+      scoreClass0: "Class 0 (Noise / Non-Keyword):",
+      scoreClass1: "Class 1 (Target Keyword):",
+      npuVerdictTitle: "Keyword Detection Result:",
+      npuVerdictWaiting: "Awaiting Inference...",
+      npuVerdictMatch: "Keyword Matched (Class 1) 🎯",
+      npuVerdictNonKw: "Non-Keyword (Class 0)",
+      npuVerdictBusy: "DS-CNN Inference in Progress...",
+      cpuTitle: "32-bit RISC-V CPU Core (PicoRV32)",
+      cpuRunning: "CPU Active (1.25mW)",
+      cpuSleeping: "WFI Sleeping (<20μW)",
+      cpuPc: "Program Counter (PC):",
+      cpuIrq: "Interrupt Status (ISR):",
+      cpuCycles: "Clock Cycles:",
+      cpuInsts: "Instructions Executed:",
+      coreRegs: "Core Register Snapshot",
+      powerTitle: "Dynamic Power & Battery Life Analysis",
+      dutyCycle: "Sleep Duty Cycle",
+      avgPower: "System Avg Power:",
+      totalEnergy: "Total Energy:",
+      estBattery: "🔋 Estimated Battery Life:",
+      daysUnit: "Days",
+      batteryNote: "Based on 200 mAh LiPo Battery (0.74 Wh)",
+      traceTitle: "Real-time Instruction Trace (Disassembly)",
+      traceSubtitle: "Last 6 execution records",
+      thPc: "PC",
+      thDisasm: "Instruction Disassembly",
+      thCycles: "Cycles",
+      thWriteback: "Register Writeback",
+      thStatus: "System Status",
+      
+      // Dynamic LED & Watch Screen interpretations
+      led00: "System Not Started",
+      led01: "0x01: System Powering On (Booting)",
+      led02: "0x02: Peripherals Initialized (Ready)",
+      led04: "0x04: Deep Standby Sleep Mode (WFI <20μW)",
+      led08: "0x08: Human Voice Detected! Starting NPU",
+      ledAA: "0xAA: Keyword Matched! Watch Display Active (MATCH 🎯)",
+      led55: "0x55: Non-Target Keyword, Returning to Sleep",
+      
+      statusBooting: "SoC Booting...",
+      statusReady: "Hardware Ready",
+      statusStandby: "Standby Sleeping (< 20μW)",
+      statusVoice: "Voice Wakeup in Progress...",
+      statusMatch: "🎯 Keyword Matched! Display ON",
+      statusNonKw: "Non-keyword -> Return to Sleep"
+    },
+
+    "zh-CN": {
+      pageTitle: "Smartwatch SoC 可视化交互模拟器 (Interactive GUI)",
+      headerTitle: "Edge AI 智能手表 SoC 可视化交互模拟器",
+      headerSubtitle: "32-bit RISC-V (PicoRV32) + AFE CIC + Hardware VAD + Level-2 KWS DS-CNN NPU",
+      clockBadge: "时钟: 12.288 MHz",
+      standbyBadge: "待机: < 20 μW",
+      sramBadge: "SRAM: 16 KB",
+      backendChecking: "检查硬件后端...",
+      backendConnected: "🟢 后端连线: Python 周期精确硬件核心",
+      backendDemo: "🟡 浏览器演示模式 (运行 web_server.py 连接实体模拟)",
+      btnRun: "连续运行 (Run)",
+      btnPause: "暂停 (Pause)",
+      btnStep: "单步执行 (Step)",
+      btnStep50: "快进 50 步",
+      btnReset: "重置 (Reset)",
+      micInject: "麦克风注入:",
+      btnSpeech: "语音流 (Speech)",
+      btnSilence: "静音环境 (Silence)",
+      btnNoise: "噪声/非关键词",
+      watchTitle: "智能手表外观与屏幕 (Watch Display)",
+      watchBattery: (d) => `100% (续航 ${d}天)`,
+      ledTitle: "板载调试 LED (0x8000_0000)",
+      afeVadTitle: "第一级：音频前端 (AFE) 与硬件 VAD",
+      steEnergy: "短时绝对值能量 (STE Energy)",
+      vadThresholdLabel: "门限: 200,000",
+      vadSpeechFlagLabel: "语音活动标志:",
+      vadSpeechActive: "检测到语音 (Active) 🟢",
+      vadSpeechSilence: "安静无声 (Silence)",
+      vadIrqFlagLabel: "唤醒中断信号:",
+      vadIrqFired: "中断触发 (HIGH) ⚡",
+      vadIrqLow: "无中断 (LOW)",
+      afeFifoLabel: "AFE 采样 FIFO:",
+      vadHangoverLabel: "Hangover 防抖计数:",
+      framesUnit: "帧",
+      npuTitle: "第二级：KWS NPU 加速器 (DS-CNN INT8)",
+      npuBadge: "2.33 ms 推理",
+      npuFsmTitle: "硬件状态机 (FSM State)",
+      scoreClass0: "Class 0 (噪声/非关键词):",
+      scoreClass1: "Class 1 (目标唤醒词):",
+      npuVerdictTitle: "唤醒词检测结果:",
+      npuVerdictWaiting: "等待推理...",
+      npuVerdictMatch: "唤醒词命中 (Class 1) 🎯",
+      npuVerdictNonKw: "非关键词 (Class 0)",
+      npuVerdictBusy: "DS-CNN 推理计算中...",
+      cpuTitle: "32-bit RISC-V 处理器核心 (PicoRV32)",
+      cpuRunning: "CPU Active (1.25mW)",
+      cpuSleeping: "WFI Sleeping (<20μW)",
+      cpuPc: "程序计数器 (PC):",
+      cpuIrq: "中断状态 (ISR):",
+      cpuCycles: "时钟周期数:",
+      cpuInsts: "已执行指令数:",
+      coreRegs: "核心寄存器快照",
+      powerTitle: "动态功耗与电池寿命分析",
+      dutyCycle: "休眠占空比 (Duty Cycle)",
+      avgPower: "全系统平均功耗:",
+      totalEnergy: "累计能耗 (Energy):",
+      estBattery: "🔋 预估手表续航力:",
+      daysUnit: "天",
+      batteryNote: "基于 200 mAh 锂聚合物电池 (0.74 Wh) 计算",
+      traceTitle: "实时指令执行反汇编日志 (Instruction Trace)",
+      traceSubtitle: "最近 6 条执行记录",
+      thPc: "PC",
+      thDisasm: "指令反汇编 (Disassembly)",
+      thCycles: "周期",
+      thWriteback: "寄存器写回 (Writeback)",
+      thStatus: "系统状态",
+      
+      // Dynamic LED & Watch Screen interpretations
+      led00: "系统未启动",
+      led01: "0x01: 系统上电开机中 (Booting)",
+      led02: "0x02: 外设初始化完成 (System Ready)",
+      led04: "0x04: 深度待机休眠模式 (WFI Sleep <20μW)",
+      led08: "0x08: 检测到人类声音！启动 NPU 推理",
+      ledAA: "0xAA: 唤醒词命中！点亮手表主屏幕 (MATCH 🎯)",
+      led55: "0x55: 非目标唤醒词，返回低功耗休眠",
+      
+      statusBooting: "SoC Booting...",
+      statusReady: "硬件已就绪",
+      statusStandby: "待机休眠中 (< 20μW)",
+      statusVoice: "语音唤醒中... 计算中",
+      statusMatch: "🎯 关键词命中！屏幕全亮",
+      statusNonKw: "非唤醒词 -> 返还休眠"
+    },
+
+    "ja": {
+      pageTitle: "スマートウォッチ SoC インタラクティブシミュレータ (GUI)",
+      headerTitle: "Edge AI スマートウォッチ SoC インタラクティブシミュレータ",
+      headerSubtitle: "32-bit RISC-V (PicoRV32) + AFE CIC + Hardware VAD + Level-2 KWS DS-CNN NPU",
+      clockBadge: "クロック: 12.288 MHz",
+      standbyBadge: "待機電力: < 20 μW",
+      sramBadge: "SRAM: 16 KB",
+      backendChecking: "バックエンド確認中...",
+      backendConnected: "🟢 接続済: Python サイクル正確ハードウェア",
+      backendDemo: "🟡 ブラウザデモ (web_server.py で実機接続)",
+      btnRun: "実行 (Run)",
+      btnPause: "一時停止 (Pause)",
+      btnStep: "ステップ (Step)",
+      btnStep50: "50ステップ早送り",
+      btnReset: "リセット (Reset)",
+      micInject: "マイク入力:",
+      btnSpeech: "音声ストリーム (Speech)",
+      btnSilence: "無音環境 (Silence)",
+      btnNoise: "ノイズ/非KW",
+      watchTitle: "スマートウォッチ外観と画面 (Watch Display)",
+      watchBattery: (d) => `100% (残量 約${d}日)`,
+      ledTitle: "オンボードデバッグ LED (0x8000_0000)",
+      afeVadTitle: "第1段：AFE 音声フロントエンド & HW VAD",
+      steEnergy: "短時間エネルギー (STE)",
+      vadThresholdLabel: "閾値: 200,000",
+      vadSpeechFlagLabel: "音声アクティビティ:",
+      vadSpeechActive: "音声検出中 (Active) 🟢",
+      vadSpeechSilence: "無音状態 (Silence)",
+      vadIrqFlagLabel: "割込み信号 (IRQ):",
+      vadIrqFired: "割込み発生 (HIGH) ⚡",
+      vadIrqLow: "割込みなし (LOW)",
+      afeFifoLabel: "AFE サンプル FIFO:",
+      vadHangoverLabel: "Hangover デバウンス:",
+      framesUnit: "フレーム",
+      npuTitle: "第2段：KWS NPU アクセラレータ (DS-CNN INT8)",
+      npuBadge: "2.33 ms 推論",
+      npuFsmTitle: "ハードウェア状態遷移 (FSM)",
+      scoreClass0: "Class 0 (ノイズ/非KW):",
+      scoreClass1: "Class 1 (ターゲットKW):",
+      npuVerdictTitle: "キーワード検出判定:",
+      npuVerdictWaiting: "推論待機中...",
+      npuVerdictMatch: "キーワード検出 (Class 1) 🎯",
+      npuVerdictNonKw: "非キーワード (Class 0)",
+      npuVerdictBusy: "DS-CNN 推論計算中...",
+      cpuTitle: "32-bit RISC-V CPU コア (PicoRV32)",
+      cpuRunning: "CPU Active (1.25mW)",
+      cpuSleeping: "WFI スリープ (<20μW)",
+      cpuPc: "プログラムカウンタ (PC):",
+      cpuIrq: "割込み状態 (ISR):",
+      cpuCycles: "クロックサイクル:",
+      cpuInsts: "実行命令数:",
+      coreRegs: "コアレジスタスナップショット",
+      powerTitle: "動的消費電力 & バッテリー分析",
+      dutyCycle: "スリープデューティ比",
+      avgPower: "システム平均電力:",
+      totalEnergy: "累積消費エネルギー:",
+      estBattery: "🔋 推定バッテリー寿命:",
+      daysUnit: "日",
+      batteryNote: "200 mAh リチウムポリマー電池 (0.74 Wh) 基準",
+      traceTitle: "命令実行トレースログ (Instruction Trace)",
+      traceSubtitle: "直近 6 件の実行履歴",
+      thPc: "PC",
+      thDisasm: "逆アセンブル (Disassembly)",
+      thCycles: "サイクル",
+      thWriteback: "レジスタ書込 (Writeback)",
+      thStatus: "システム状態",
+      
+      // Dynamic LED & Watch Screen interpretations
+      led00: "システム未起動",
+      led01: "0x01: システム起動中 (Booting)",
+      led02: "0x02: 周辺回路準備完了 (Ready)",
+      led04: "0x04: ディープスタンバイ (WFI <20μW)",
+      led08: "0x08: 音声検出！NPU推論開始",
+      ledAA: "0xAA: キーワード一致！画面点灯 (MATCH 🎯)",
+      led55: "0x55: 非キーワード、省電力復帰",
+      
+      statusBooting: "SoC 起動中...",
+      statusReady: "ハードウェア準備完了",
+      statusStandby: "待機スリープ中 (< 20μW)",
+      statusVoice: "音声ウェイクアップ中...",
+      statusMatch: "🎯 キーワード一致！全画面点灯",
+      statusNonKw: "非キーワード -> スリープ復帰"
+    }
+  };
+
+  let currentLang = localStorage.getItem("smartwatch_sim_lang") || "zh-TW";
+  if (!I18N[currentLang]) currentLang = "zh-TW";
+
+  function t(key) {
+    const dict = I18N[currentLang] || I18N["zh-TW"];
+    return dict[key] || (I18N["zh-TW"][key] || key);
+  }
+
+  function applyLanguage(lang) {
+    if (!I18N[lang]) lang = "zh-TW";
+    currentLang = lang;
+    localStorage.setItem("smartwatch_sim_lang", lang);
+    document.documentElement.lang = lang;
+    
+    // Update select element
+    const sel = document.getElementById("lang-select");
+    if (sel && sel.value !== lang) sel.value = lang;
+
+    // Static text with data-i18n
+    document.querySelectorAll("[data-i18n]").forEach(elem => {
+      const key = elem.getAttribute("data-i18n");
+      const val = t(key);
+      if (typeof val === "string") {
+        if (elem.tagName === "TITLE") {
+          document.title = val;
+        } else {
+          elem.innerText = val;
+        }
+      }
+    });
+
+    // Update play button text
+    const btnText = document.getElementById("play-text");
+    if (btnText) {
+      btnText.innerText = isPlaying ? t("btnPause") : t("btnRun");
+    }
+
+    // Refresh dynamic status elements
+    updateUI();
+  }
+
+  function changeLanguage(lang) {
+    applyLanguage(lang);
+  }
+
+  // Complete JavaScript SoC State Engine
+  const socState = {
+    pc: 0,
+    regs: new Uint32Array(32),
+    leds: 0x00,
+    isSleeping: false,
+    inIrq: false,
+    irqPending: 0,
+    irqMask: 0xFFFFFFFF,
+    cycles: 0,
+    instructions: 0,
+    trace: [],
+    
+    // AFE
+    afeEnabled: false,
+    fifoCount: 0,
+    
+    // VAD
+    vadEnabled: false,
+    vadEnergy: 0,
+    vadThreshold: 200000,
+    speechActive: false,
+    vadIrq: false,
+    
+    // NPU
+    npuState: "IDLE",
+    npuBusy: false,
+    npuDone: false,
+    score0: 0,
+    score1: 0,
+    keywordDetected: false,
+    npuCyclesLeft: 0,
+    
+    // Power
+    sleepCycles: 0,
+    cpuCycles: 0,
+    npuCycles: 0
+  };
+
+  let isPlaying = false;
+  let timerId = null;
+
+  // Assembly firmware lines representation
+  const FIRMWARE = [
+    { pc: 0x00, asm: "jal zero, 0x20", action: (s) => { s.pc = 0x20; } },
+    { pc: 0x20, asm: "lui sp, 0x10002", action: (s) => { s.regs[2] = 0x10002000; s.pc += 4; } },
+    { pc: 0x24, asm: "lui s0, 0x80000", action: (s) => { s.regs[8] = 0x80000000; s.pc += 4; } },
+    { pc: 0x28, asm: "addi t0, zero, 1", action: (s) => { s.regs[5] = 1; s.pc += 4; } },
+    { pc: 0x2c, asm: "sw t0, 0(s0) [LED=0x01]", action: (s) => { s.leds = 0x01; s.pc += 4; } },
+    { pc: 0x30, asm: "lui s1, 0x40000", action: (s) => { s.regs[9] = 0x40000000; s.pc += 4; } },
+    { pc: 0x34, asm: "addi t0, zero, 1", action: (s) => { s.regs[5] = 1; s.pc += 4; } },
+    { pc: 0x38, asm: "sw t0, 0(s1) [AFE_CTRL=1]", action: (s) => { s.afeEnabled = true; s.pc += 4; } },
+    { pc: 0x3c, asm: "lui t0, 0x31", action: (s) => { s.regs[5] = 0x31000; s.pc += 4; } },
+    { pc: 0x40, asm: "addi t0, t0, -704 [THRES=200k]", action: (s) => { s.regs[5] = 200000; s.pc += 4; } },
+    { pc: 0x44, asm: "sw t0, 20(s1)", action: (s) => { s.vadThreshold = 200000; s.pc += 4; } },
+    { pc: 0x48, asm: "addi t0, zero, 3", action: (s) => { s.regs[5] = 3; s.pc += 4; } },
+    { pc: 0x4c, asm: "sw t0, 24(s1) [HANGOVER=3]", action: (s) => { s.pc += 4; } },
+    { pc: 0x50, asm: "addi t0, zero, 1", action: (s) => { s.regs[5] = 1; s.pc += 4; } },
+    { pc: 0x54, asm: "sw t0, 16(s1) [VAD_CTRL=1]", action: (s) => { s.vadEnabled = true; s.pc += 4; } },
+    { pc: 0x58, asm: "maskirq zero, -4 [Unmask 0,1]", action: (s) => { s.irqMask = 0xFFFFFFFC; s.pc += 4; } },
+    { pc: 0x5c, asm: "addi t0, zero, 2", action: (s) => { s.regs[5] = 2; s.pc += 4; } },
+    { pc: 0x60, asm: "sw t0, 0(s0) [LED=0x02 Ready]", action: (s) => { s.leds = 0x02; s.pc += 4; } },
+    { pc: 0x64, asm: "addi t0, zero, 4", action: (s) => { s.regs[5] = 4; s.pc += 4; } },
+    { pc: 0x68, asm: "sw t0, 0(s0) [LED=0x04 Sleep]", action: (s) => { s.leds = 0x04; s.pc += 4; } },
+    { pc: 0x6c, asm: "waitirq [Enter WFI Sleep]", action: (s) => { s.isSleeping = true; s.pc += 4; } }
+  ];
+
+  function initUI() {
+    const ledContainer = document.getElementById("led-container");
+    ledContainer.innerHTML = "";
+    for (let i = 7; i >= 0; i--) {
+      const led = document.createElement("div");
+      led.id = "led-bit-" + i;
+      led.className = "w-7 h-7 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-500 transition-all";
+      led.innerText = i;
+      ledContainer.appendChild(led);
+    }
+    applyLanguage(currentLang);
+  }
+
+  let hasBackend = false;
+
+  async function checkBackend() {
+    try {
+      const res = await fetch("/api/status");
+      if (res.ok) {
+        const data = await res.json();
+        hasBackend = true;
+        const b = document.getElementById("backend-badge");
+        b.innerText = t("backendConnected");
+        b.className = "px-3 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-full text-xs font-semibold";
+        applyBackendState(data);
+        return;
+      }
+    } catch (e) {}
+    hasBackend = false;
+    const b = document.getElementById("backend-badge");
+    b.innerText = t("backendDemo");
+    b.className = "px-3 py-1 bg-amber-950 text-amber-300 border border-amber-800 rounded-full text-xs font-semibold";
+  }
+
+  function applyBackendState(data) {
+    socState.pc = parseInt(data.cpu.pc, 16);
+    socState.cycles = data.total_cycles;
+    socState.instructions = data.cpu.instruction_count;
+    socState.isSleeping = data.cpu.sleeping;
+    socState.inIrq = data.cpu.in_irq;
+    socState.leds = parseInt(data.leds.val, 16);
+    
+    socState.afeEnabled = data.afe.enabled;
+    socState.fifoCount = data.afe.fifo_count;
+    
+    socState.vadEnabled = data.vad.enabled;
+    socState.vadThreshold = data.vad.threshold;
+    socState.vadEnergy = data.vad.current_energy;
+    socState.speechActive = data.vad.speech_active;
+    socState.vadIrq = data.vad.irq_pending;
+    
+    socState.npuState = data.npu.state;
+    socState.npuBusy = data.npu.busy;
+    socState.npuDone = data.npu.done;
+    socState.score0 = data.npu.score_0;
+    socState.score1 = data.npu.score_1;
+    socState.keywordDetected = data.npu.keyword_detected;
+    
+    if (data.cpu.regs) {
+      socState.regs[2] = parseInt(data.cpu.regs.sp, 16);
+      socState.regs[8] = parseInt(data.cpu.regs.s0, 16);
+      socState.regs[9] = parseInt(data.cpu.regs.s1, 16);
+      socState.regs[5] = parseInt(data.cpu.regs.t0, 16);
+    }
+    
+    if (data.trace && data.trace.length > 0) {
+      socState.trace = data.trace.map(t => ({
+        pc: t.pc,
+        asm: t.disasm,
+        cyc: t.cycles
+      })).reverse();
+    }
+    
+    // Update power stats
+    socState.sleepCycles = Math.round(data.total_cycles * (data.power.sleep_pct / 100));
+    socState.cpuCycles = Math.round(data.total_cycles * (data.power.cpu_active_pct / 100));
+    socState.npuCycles = Math.round(data.total_cycles * (data.power.npu_active_pct / 100));
+    
+    updateUI();
+  }
+
+  async function stepSim(steps = 1) {
+    if (hasBackend) {
+      try {
+        const res = await fetch("/api/step", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ steps })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          applyBackendState(data);
+          return;
+        }
+      } catch (e) {
+        console.error("Backend step error:", e);
+      }
+    }
+
+    // Client-side fallback simulation
+    for (let st = 0; st < steps; st++) {
+      socState.cycles += 3;
+
+      // Handle NPU inference progress
+      if (socState.npuBusy) {
+        socState.npuCycles += 3;
+        socState.npuCyclesLeft -= 3;
+        if (socState.npuCyclesLeft <= 0) {
+          socState.npuBusy = false;
+          socState.npuDone = true;
+          socState.npuState = "DONE";
+          if (socState.keywordDetected) {
+            socState.score0 = -35;
+            socState.score1 = 88;
+            socState.leds = 0xAA;
+          } else {
+            socState.score0 = 58;
+            socState.score1 = -51;
+            socState.leds = 0x55;
+          }
+          socState.isSleeping = false;
+        } else {
+          const progress = 1 - (socState.npuCyclesLeft / 28688);
+          if (progress < 0.3) socState.npuState = "CONV1";
+          else if (progress < 0.6) socState.npuState = "DW";
+          else if (progress < 0.8) socState.npuState = "PW";
+          else if (progress < 0.95) socState.npuState = "GAP";
+          else socState.npuState = "FC";
+        }
+        continue;
+      }
+
+      // Check IRQ wake up
+      if (socState.isSleeping) {
+        socState.sleepCycles += 3;
+        if (socState.vadIrq) {
+          socState.isSleeping = false;
+          socState.inIrq = true;
+          socState.leds = 0x08;
+          socState.npuBusy = true;
+          socState.npuCyclesLeft = 28688;
+          socState.vadIrq = false;
+        }
+        continue;
+      }
+
+      socState.cpuCycles += 3;
+      socState.instructions++;
+
+      const inst = FIRMWARE.find(f => f.pc === socState.pc);
+      if (inst) {
+        inst.action(socState);
+        addTrace(inst.pc, inst.asm, 3);
+      } else {
+        if (socState.leds === 0xAA || socState.leds === 0x55) {
+          socState.pc = 0x64;
+        } else {
+          socState.pc = 0x00;
+        }
+      }
+    }
+    updateUI();
+  }
+
+  function addTrace(pc, asm, cyc) {
+    socState.trace.unshift({ pc, asm, cyc });
+    if (socState.trace.length > 6) socState.trace.pop();
+  }
+
+  async function injectAudio(type) {
+    if (hasBackend) {
+      try {
+        const res = await fetch("/api/feed_audio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          applyBackendState(data);
+          if (!isPlaying) {
+            stepSim(50);
+          }
+          return;
+        }
+      } catch (e) {
+        console.error("Backend feed error:", e);
+      }
+    }
+
+    if (type === "speech") {
+      socState.vadEnergy = 245000;
+      socState.speechActive = true;
+      socState.vadIrq = true;
+      socState.fifoCount = 160;
+      socState.keywordDetected = true;
+    } else if (type === "tone") {
+      socState.vadEnergy = 220000;
+      socState.speechActive = true;
+      socState.vadIrq = true;
+      socState.fifoCount = 160;
+      socState.keywordDetected = false;
+    } else {
+      socState.vadEnergy = 12000;
+      socState.speechActive = false;
+      socState.vadIrq = false;
+      socState.fifoCount = 0;
+    }
+    updateUI();
+  }
+
+  async function resetSim() {
+    if (hasBackend) {
+      try {
+        const res = await fetch("/api/reset", { method: "POST" });
+        if (res.ok) {
+          const data = await res.json();
+          applyBackendState(data);
+          if (isPlaying) togglePlay();
+          return;
+        }
+      } catch (e) {
+        console.error("Backend reset error:", e);
+      }
+    }
+
+    socState.pc = 0;
+    socState.regs.fill(0);
+    socState.leds = 0x00;
+    socState.isSleeping = false;
+    socState.inIrq = false;
+    socState.cycles = 0;
+    socState.instructions = 0;
+    socState.trace = [];
+    socState.afeEnabled = false;
+    socState.fifoCount = 0;
+    socState.vadEnabled = false;
+    socState.vadEnergy = 0;
+    socState.speechActive = false;
+    socState.vadIrq = false;
+    socState.npuState = "IDLE";
+    socState.npuBusy = false;
+    socState.npuDone = false;
+    socState.score0 = 0;
+    socState.score1 = 0;
+    socState.keywordDetected = false;
+    socState.sleepCycles = 0;
+    socState.cpuCycles = 0;
+    socState.npuCycles = 0;
+    if (isPlaying) togglePlay();
+    updateUI();
+  }
+
+  function togglePlay() {
+    isPlaying = !isPlaying;
+    const btnIcon = document.getElementById("play-icon");
+    const btnText = document.getElementById("play-text");
+    if (isPlaying) {
+      btnIcon.innerText = "⏸️";
+      btnText.innerText = t("btnPause");
+      timerId = setInterval(() => stepSim(hasBackend ? 50 : 5), 80);
+    } else {
+      btnIcon.innerText = "▶";
+      btnText.innerText = t("btnRun");
+      clearInterval(timerId);
+    }
+  }
+
+  function updateUI() {
+    // LEDs
+    document.getElementById("led-hex").innerText = "0x" + socState.leds.toString(16).padStart(2, '0').toUpperCase();
+    for (let i = 0; i < 8; i++) {
+      const bit = (socState.leds >> i) & 1;
+      const elem = document.getElementById("led-bit-" + i);
+      if (elem) {
+        if (bit) {
+          elem.className = "w-7 h-7 rounded-full bg-emerald-500 border border-emerald-300 flex items-center justify-center text-[10px] font-bold text-gray-950 led-glow-green";
+        } else {
+          elem.className = "w-7 h-7 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-500";
+        }
+      }
+    }
+
+    // LED Meaning & Watch screen
+    const modeElem = document.getElementById("watch-mode");
+    const statusElem = document.getElementById("watch-status");
+    const meaningElem = document.getElementById("led-meaning");
+    const screenElem = document.getElementById("watch-screen");
+
+    if (socState.leds === 0x01) {
+      meaningElem.innerText = t("led01");
+      statusElem.innerText = t("statusBooting");
+      statusElem.className = "text-[11px] text-amber-400 mt-2 font-medium";
+      screenElem.style.background = "#050505";
+      modeElem.innerText = "BOOTING";
+    } else if (socState.leds === 0x02) {
+      meaningElem.innerText = t("led02");
+      statusElem.innerText = t("statusReady");
+      statusElem.className = "text-[11px] text-sky-400 mt-2 font-medium";
+      modeElem.innerText = "READY";
+    } else if (socState.leds === 0x04) {
+      meaningElem.innerText = t("led04");
+      modeElem.innerText = "ALWAYS-ON STANDBY";
+      statusElem.innerText = t("statusStandby");
+      statusElem.className = "text-[11px] text-emerald-400 mt-2 font-medium";
+      screenElem.style.background = "#000000";
+    } else if (socState.leds === 0x08) {
+      meaningElem.innerText = t("led08");
+      modeElem.innerText = "VOICE DETECTED";
+      statusElem.innerText = t("statusVoice");
+      statusElem.className = "text-[11px] text-purple-400 mt-2 font-medium animate-pulse";
+      screenElem.style.background = "#110726";
+    } else if (socState.leds === 0xAA) {
+      meaningElem.innerText = t("ledAA");
+      modeElem.innerText = "HELLO SIRI / WAKEUP";
+      statusElem.innerText = t("statusMatch");
+      statusElem.className = "text-[11px] text-emerald-300 font-bold mt-2";
+      screenElem.style.background = "radial-gradient(circle, #064e3b 0%, #022c22 100%)";
+    } else if (socState.leds === 0x55) {
+      meaningElem.innerText = t("led55");
+      modeElem.innerText = "NON-KEYWORD";
+      statusElem.innerText = t("statusNonKw");
+      statusElem.className = "text-[11px] text-gray-400 mt-2";
+      screenElem.style.background = "#0a0a0a";
+    } else {
+      meaningElem.innerText = t("led00");
+    }
+
+    // VAD
+    document.getElementById("vad-energy-val").innerText = socState.vadEnergy.toLocaleString();
+    const pct = Math.min(100, (socState.vadEnergy / 350000) * 100);
+    const bar = document.getElementById("vad-energy-bar");
+    bar.style.width = pct + "%";
+    bar.className = socState.vadEnergy >= 200000 ? "h-full bg-rose-500" : "h-full bg-emerald-500";
+    
+    document.getElementById("vad-speech-flag").innerText = socState.speechActive ? t("vadSpeechActive") : t("vadSpeechSilence");
+    document.getElementById("vad-speech-flag").className = socState.speechActive ? "font-bold text-emerald-400" : "font-bold text-gray-500";
+    document.getElementById("vad-irq-flag").innerText = socState.vadIrq ? t("vadIrqFired") : t("vadIrqLow");
+    document.getElementById("afe-fifo-count").innerText = socState.fifoCount + " / 256 words";
+    document.getElementById("vad-hangover-val").innerText = (socState.speechActive ? 3 : 0) + " " + t("framesUnit");
+
+    // NPU FSM
+    document.getElementById("npu-state-text").innerText = socState.npuState;
+    const fsmLayers = ["conv1", "dw", "pw", "gap", "fc", "done"];
+    fsmLayers.forEach(l => {
+      const e = document.getElementById("fsm-" + l);
+      if (e) {
+        if (socState.npuState.toLowerCase() === l) {
+          e.className = "py-1 bg-purple-600 text-white rounded font-bold shadow";
+        } else {
+          e.className = "py-1 bg-gray-800 text-gray-500 rounded";
+        }
+      }
+    });
+
+    document.getElementById("score-class-0").innerText = socState.score0;
+    document.getElementById("score-class-1").innerText = socState.score1;
+    const verdictElem = document.getElementById("npu-verdict");
+    if (socState.npuDone) {
+      if (socState.score1 > socState.score0) {
+        verdictElem.innerText = t("npuVerdictMatch");
+        verdictElem.className = "font-bold px-2 py-0.5 rounded text-xs bg-emerald-950 text-emerald-300 border border-emerald-800";
+      } else {
+        verdictElem.innerText = t("npuVerdictNonKw");
+        verdictElem.className = "font-bold px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-300";
+      }
+    } else if (socState.npuBusy) {
+      verdictElem.innerText = t("npuVerdictBusy");
+      verdictElem.className = "font-bold px-2 py-0.5 rounded text-xs bg-purple-950 text-purple-300 animate-pulse";
+    } else {
+      verdictElem.innerText = t("npuVerdictWaiting");
+      verdictElem.className = "font-bold px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400";
+    }
+
+    // CPU
+    document.getElementById("cpu-pc-val").innerText = "0x" + socState.pc.toString(16).padStart(8, '0');
+    document.getElementById("sys-cycles").innerText = socState.cycles.toLocaleString();
+    document.getElementById("sys-inst-count").innerText = socState.instructions.toLocaleString();
+    const sleepBadge = document.getElementById("cpu-sleep-badge");
+    if (socState.isSleeping) {
+      sleepBadge.innerText = t("cpuSleeping");
+      sleepBadge.className = "text-xs px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded";
+    } else {
+      sleepBadge.innerText = t("cpuRunning");
+      sleepBadge.className = "text-xs px-2 py-0.5 bg-sky-950 text-sky-300 border border-sky-800 rounded";
+    }
+
+    document.getElementById("reg-sp").innerText = "0x" + (socState.regs[2] || 0).toString(16);
+    document.getElementById("reg-s0").innerText = "0x" + (socState.regs[8] || 0).toString(16);
+    document.getElementById("reg-s1").innerText = "0x" + (socState.regs[9] || 0).toString(16);
+    document.getElementById("reg-t0").innerText = "0x" + (socState.regs[5] || 0).toString(16);
+
+    // Power
+    const totCycles = Math.max(1, socState.sleepCycles + socState.cpuCycles + socState.npuCycles);
+    const sleepRatio = (socState.sleepCycles / totCycles) * 100;
+    document.getElementById("duty-pct").innerText = sleepRatio.toFixed(1) + " %";
+    document.getElementById("duty-bar").style.width = sleepRatio + "%";
+
+    const tSleep = socState.sleepCycles / 12288000;
+    const tCpu = socState.cpuCycles / 12288000;
+    const tNpu = socState.npuCycles / 12288000;
+    const energyUj = (tSleep * 18.5) + (tCpu * 1250) + (tNpu * 3820);
+    const totSec = Math.max(0.0001, tSleep + tCpu + tNpu);
+    const avgPower = energyUj / totSec;
+    document.getElementById("avg-power").innerText = avgPower.toFixed(1) + " μW";
+    document.getElementById("total-energy").innerText = energyUj.toFixed(2) + " μJ";
+    const days = (200 * 1000 * 3.7) / (avgPower * 24);
+    const daysStr = days.toFixed(1);
+    document.getElementById("est-days").innerText = daysStr + " " + t("daysUnit");
+    
+    const watchBatFunc = I18N[currentLang].watchBattery || I18N["zh-TW"].watchBattery;
+    document.getElementById("watch-battery").innerText = watchBatFunc(daysStr);
+
+    // Trace
+    const tbody = document.getElementById("trace-tbody");
+    tbody.innerHTML = "";
+    socState.trace.forEach(tRow => {
+      const trElem = document.createElement("tr");
+      trElem.className = "border-b border-gray-800/60 hover:bg-gray-800/40";
+      trElem.innerHTML = `
+        <td class="py-1.5 px-3 text-sky-400">0x${tRow.pc.toString(16).padStart(8, '0')}</td>
+        <td class="py-1.5 px-3 font-semibold text-gray-200">${tRow.asm}</td>
+        <td class="py-1.5 px-3 text-gray-400">${tRow.cyc}</td>
+        <td class="py-1.5 px-3 text-emerald-400">-</td>
+        <td class="py-1.5 px-3 text-gray-400">${socState.isSleeping ? "[Sleep]" : "Normal"}</td>
+      `;
+      tbody.appendChild(trElem);
+    });
+  }
+
+  window.onload = () => {
+    initUI();
+    checkBackend();
+  };
+</script>
+</body>
+</html>

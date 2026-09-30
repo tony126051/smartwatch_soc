@@ -1,0 +1,10 @@
+Edge AI 智慧手錶 SoC 晶片設計與 FPGA 驗證計畫書1. 專案目標與定位本專案旨在設計一款應用於智慧手錶的超低功耗、Always-on 語音喚醒（Voice Wake-up）系統單晶片（SoC），並在 FPGA 開發平台上完成硬體原型（Hardware Prototype）的驗證。未來架構具備高度擴充性，可逐步整合健康感測、運動追蹤與顯示加速等功能。核心挑戰：微瓦（μW）級的待機功耗、極限的晶片內（On-chip）記憶體配置。驗證平台：AMD/Xilinx Artix-7 FPGA (推薦開發板：Digilent Arty A7-35T/100T)。2. 系統硬體架構 (System Architecture)晶片採用異質 SoC 架構，透過標準系統匯流排（AXI / APB）連接各專用硬體加速器與周邊 IP，以達到極致的 PPA（功耗、效能、面積）平衡。2.1 核心模組規劃控制大腦 (CPU Core)：採用開源 32 位元 RISC-V 處理器（如 NEORV32 或 Hummingbird E203），負責作業系統排程、系統初始化與周邊協調。音訊輸入介面 (Audio Front-End)：PDM / I2S 接收器：對接外部 MEMS 數位麥克風。降頻濾波器 (Decimation Filter)：將高頻 PDM 訊號轉換為 16kHz / 16-bit PCM 語音串流。語音活動偵測 (Hardware VAD)：第一級過濾（Always-on）：純硬體時域能量（Energy-based）計算電路。功耗目標 < 20 μW。偵測到人類語音頻率時，始向 CPU 發出中斷（Interrupt）並開啟下一級運算。關鍵字辨識加速器 (KWS NPU)：第二級辨識：專門執行神經網路矩陣乘加運算的 MAC 陣列（Multiplier-Accumulator Array）。配合有限狀態機（FSM）自動定址，專責辨識特定喚醒詞（如 "Hey Siri"）。晶片內記憶體 (On-chip SRAM / BRAM)：利用 FPGA 內建的 Block RAM，儲存 CPU 程式碼、NPU 量化權重（Weights）與語音特徵快取。杜絕外部記憶體存取以節省功耗。2.2 未來擴充模組 (Future Roadmap)健康生醫加速器 (DSP Engine)：透過 I2C/SPI 連接 PPG 感測器，以硬體 FIR 濾波器過濾運動雜訊，計算心率與血氧。運動追蹤模組 (IMU FSM)：讀取六軸感測器，以硬體有限狀態機實現低功耗計步與跌倒偵測。顯示與圖形加速器 (GUI Accelerator)：包含 SPI/MIPI 顯示驅動與 2D DMA 搬移單元，實現流暢的錶盤滑動與圖層疊加。電源管理單元 (PMU)：實作硬體多級休眠（Clock Gating / Power Gating），由 32.768 kHz 低頻時脈驅動。3. 軟體演算法與模型優化3.1 模型架構選用 DS-CNN (Depthwise Separable CNN) 或 TC-ResNet 輕量化語音時間序列模型。特徵工程：硬體或軟體提取 MFCC（梅爾頻率倒譜係數）。3.2 模型壓縮技術INT8 / INT4 極致量化：將模型參數與激活值壓低至 8 位元或 4 位元整數。零外部存取策略：壓縮後的模型尺寸限制在數十 KB 內，確保能完全塞入 On-chip SRAM。4. FPGA IC 設計實作工作流 (Workflow)[ 步驟一：Python 黃金模型 ] ➔ 訓練 KWS 模型並進行 INT8 量化，導出 input.txt 與 output_golden.txt。
+         │
+         ▼
+[ 步驟二：RTL 硬體描述 ]   ➔ 使用 Verilog 撰寫 PDM 解碼、VAD 邏輯與 NPU MAC 運算矩陣。
+         │
+         ▼
+[ 步驟三：ModelSim 前仿真 ] ➔ 撰寫 Testbench 餵入 input.txt，比對暫存器輸出是否與黃金模型 100% 吻合。
+         │
+         ▼
+[ 步驟四：Vivado 綜合與上板 ] ➔ 連接 RISC-V 匯流排，進行佈局繞線，產生 Bitstream 燒錄至 Arty A7 測試。
