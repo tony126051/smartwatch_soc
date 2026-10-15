@@ -38,11 +38,11 @@ docs/spec/en/
 
 | Spec Code | Document Title | Primary Scope | Covered IDs | Target Audience |
 |---|---|---|---|---|
-| **SRS** | [`00_system_requirements_spec.md`](00_system_requirements_spec.md) | System goals, power (<20μW), area (<20k gates), memory (16KB) budgets | `REQ-SYS-*` | Architects, AI Agents |
-| **HIS** | [`01_hardware_interface_spec.md`](01_hardware_interface_spec.md) | APB3 bus timing, bit-exact register maps, interrupt handshakes, pinouts | `REQ-BUS-*` | Digital IC, Firmware, AI Agents |
-| **AGS** | [`02_algorithm_and_golden_model_spec.md`](02_algorithm_and_golden_model_spec.md) | Mathematical models, INT8 quantization scaling, bit growth, golden vectors | `REQ-ALG-*` | Algorithm, Verification, AI Agents |
-| **SWS** | [`03_firmware_and_software_spec.md`](03_firmware_and_software_spec.md) | ITCM/DTCM layout, reset/trap vectors, LED status codes, assembler specs | `REQ-FW-*` | Firmware Engineers, AI Agents |
-| **VAS** | [`04_verification_and_acceptance_spec.md`](04_verification_and_acceptance_spec.md) | 5 regression suites, bit-true criteria, cycle bounds, troubleshooting | `REQ-VERIF-*` | Verification, CI/CD, AI Agents |
+| **SRS** | [`00_system_requirements_spec.md`](00_system_requirements_spec.md) | System goals, power (<15μW standby), area (<25k gates), memory (18KB SRAM) budgets | `REQ-SYS-*` | Architects, AI Agents |
+| **HIS** | [`01_hardware_interface_spec.md`](01_hardware_interface_spec.md) | APB3 bus timing, bit-exact register maps, single-wire DDR PDM & BIST pinouts | `REQ-BUS-*` | Digital IC, Firmware, AI Agents |
+| **AGS** | [`02_algorithm_and_golden_model_spec.md`](02_algorithm_and_golden_model_spec.md) | Mathematical models, INT8 quantization scaling, dual-mic beamformer, 32-bit BIST | `REQ-ALG-*` | Algorithm, Verification, AI Agents |
+| **SWS** | [`03_firmware_and_software_spec.md`](03_firmware_and_software_spec.md) | ITCM/DTCM layout, Mini-POST self-test, 2-Tier context FSM, assembler specs | `REQ-FW-*` | Firmware Engineers, AI Agents |
+| **VAS** | [`04_verification_and_acceptance_spec.md`](04_verification_and_acceptance_spec.md) | 7 regression suites, bit-true criteria, cycle bounds, 7-point fault injection | `REQ-VERIF-*` | Verification, CI/CD, AI Agents |
 | **AGD** | [`05_ai_agent_development_guide.md`](05_ai_agent_development_guide.md) | AI Agent SOP, read/write boundaries, synthesizable Verilog rules, never-list | `RULE-AI-*` | Autonomous AI Agents |
 | **TMP** | [`06_task_worklog_template.md`](06_task_worklog_template.md) | Standardized task handover and requirement traceability log format | N/A | AI Agents, Reviewers |
 
@@ -57,17 +57,18 @@ All AI agents operating on this repository **MUST** adhere to five fundamental p
 2. **Bit-True Invariance**:
    The algorithm golden model ([`model/`](../../../model)), digital hardware RTL ([`rtl/`](../../../rtl)), and cycle-accurate simulator ([`sim/simulator/`](../../../sim/simulator)) **must maintain 100% bit-accurate mathematical equivalence**.
 3. **Hard Resource Budgets**:
-   - Total on-chip SRAM must not exceed **64 KB** (current configuration: 16 KB SRAM = 8KB Boot ROM + 8KB Data RAM).
+   - Total on-chip SRAM must not exceed **64 KB** (current v2.0 configuration: 18 KB SRAM = 8KB Boot ROM + 8KB Data RAM + 1KB Weight RAM + 1KB Audio FIFO).
+   - Silicon logic gate count budget ceiling **< 25,000 gates** (nominal ~22,800 gates).
    - Zero external DRAM dependencies.
-   - Standby power must remain under $< 20\text{ }\mu\text{W}$.
+   - Standby power must remain under $< 20\text{ }\mu\text{W}$ (measured $< 15\text{ }\mu\text{W}$).
 4. **Green Regression Handover**:
    The mandatory exit criterion before finishing any task is executing:
    ```bash
    python3 sim/run_simulator.py --mode regression
    ```
-   **All 5 regression test cases must report PASS**. Zero regressions are tolerated.
+   **All 7 regression test cases must report PASS**. Zero regressions are tolerated.
 5. **Requirement Traceability**:
-   Every code change must reference the associated Requirement ID (e.g. `REQ-VAD-002`) in its summary and commit notes.
+   Every code change must reference the associated Requirement ID (e.g. `REQ-VAD-002`, `REQ-BIST-001`) in its summary and commit notes.
 
 ---
 

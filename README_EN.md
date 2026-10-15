@@ -102,7 +102,9 @@ All feature buffers and memory remain on-chip (**18 KB On-chip SRAM**) to preven
 
 ```text
 smart_watch/
-├── docs/                       # Specifications and manuals
+├── docs/                       # Specifications, SDD Framework & PRD
+│   ├── prd/                           # Product Requirements Document (00_wearable_audio_ai_prd.md)
+│   ├── spec/                          # Formal SSOT specifications (00_SRS ~ 06_TMP, zh-TW & en)
 │   ├── developer_onboarding_guide.md  # Onboarding guide for new engineers
 │   ├── simulator_guide.md             # Detailed simulator manual & CLI guide
 │   ├── system_architecture.md         # Hardware timing & architecture spec
@@ -112,25 +114,27 @@ smart_watch/
 │   ├── golden_vad.py                  # Short-time energy VAD golden model
 │   ├── golden_mfcc.py                 # MFCC feature extraction golden model
 │   ├── golden_npu.py                  # DS-CNN INT8 fixed-point inference model
-│   └── golden_vectors/                # Golden test vectors and quantized weights
-├── rtl/                        # Synthesizable Verilog HDL descriptions
-│   ├── afe/                           # PDM receiver, CIC decimator, audio FIFO
+│   ├── golden_bist.py                 # 32-bit LFSR PRPG + MISR BIST golden signature model
+│   └── golden_vectors/                # Golden test vectors, quantized weights, and BIST signature
+├── rtl/                        # Synthesizable Verilog HDL descriptions (Verilog-2001)
+│   ├── afe/                           # PDM receiver, CIC decimator, 512w Pre-Roll FIFO, micro-beamformer
 │   ├── vad/                           # Stage-1 Always-on hardware VAD core
-│   ├── npu/                           # Stage-2 KWS NPU MAC array & FSM
+│   ├── npu/                           # Stage-2 KWS NPU MAC array, FSM & 1KB Dual-Bank Weight RAM
+│   ├── bist/                          # 5ms Production Hardware ATE BIST engine (LFSR + MISR)
 │   ├── cpu/                           # 32-bit RISC-V PicoRV32 processor
-│   ├── bus/                           # APB bus interconnect & adapters
-│   └── top/                           # Full heterogeneous SoC top-level
-├── sim/                        # Verification & visualization suite
+│   ├── bus/                           # APB bus interconnect & address decoders
+│   └── top/                           # Full heterogeneous SoC top-level (kws_accelerator_subsys)
+├── sim/                        # Verification & visualization suite (Pure Python, zero-dep)
 │   ├── simulator/                     # Cycle-accurate Python SoC simulator engine
-│   │   ├── cpu.py, bus.py, afe.py, vad.py, npu.py, power.py, vcd.py, i18n.py ...
-│   ├── run_simulator.py               # Unified simulator driver (--lang support)
-│   ├── run_sim.py                     # EDA testbench script (iverilog)
+│   │   ├── cpu.py, bus.py, afe.py, vad.py, npu.py, bist.py, power.py, vcd.py, i18n.py ...
+│   ├── run_simulator.py               # Unified simulator driver (7 regression tests, --lang support)
+│   ├── run_sim.py                     # Regression test compatibility script
 │   ├── web_server.py                  # Real-time WebSocket/HTTP simulation server
 │   ├── smartwatch_simulator_ui.html   # Interactive HTML5 Web GUI (i18n enabled)
-│   ├── simulator_dashboard.html       # Standalone architecture dashboard
-│   └── waves_soc.vcd                  # Exported digital logic waveforms
+│   ├── simulator_dashboard.html       # Standalone architecture dashboard (polar plot & BIST meter)
+│   └── waves_soc.vcd                  # Exported digital logic waveforms (IEEE 1364)
 └── sw/                         # Embedded firmware & tools
-    ├── app/                           # Source code (main.s, main.c)
+    ├── app/                           # Source code (main.s, main.c, Mini-POST self-test)
     ├── include/                       # Register definitions (soc_regs.h)
     ├── build_firmware.py              # Pure Python lightweight RISC-V assembler
     └── firmware.hex                   # Assembled 32-bit binary machine code

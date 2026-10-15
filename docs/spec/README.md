@@ -38,11 +38,11 @@ docs/spec/
 
 | 規格代號 | 規格文件名稱 | 核心職責 | 涵蓋需求 ID | 主要受眾 |
 |---|---|---|---|---|
-| **SRS** | [`00_system_requirements_spec.md`](00_system_requirements_spec.md) | 定義系統功能、功耗（<20μW）、面積（<20k門）、記憶體（16KB）上限 | `REQ-SYS-*` | 系統架構師、AI Agent |
-| **HIS** | [`01_hardware_interface_spec.md`](01_hardware_interface_spec.md) | 定義 APB3 匯流排時序、位元級暫存器定義、中斷握手、頂層 Pinout | `REQ-BUS-*` | 數位 IC、韌體、AI Agent |
-| **AGS** | [`02_algorithm_and_golden_model_spec.md`](02_algorithm_and_golden_model_spec.md) | 定義數學轉換公式、INT8 定點化縮放、量化飽和規則與標準測試向量格式 | `REQ-ALG-*` | 演算法、驗證、AI Agent |
-| **SWS** | [`03_firmware_and_software_spec.md`](03_firmware_and_software_spec.md) | 定義 ITCM/DTCM 映射、重設/中斷常式、LED 狀態碼、純 Python 組譯器規格 | `REQ-FW-*` | 韌體工程師、AI Agent |
-| **VAS** | [`04_verification_and_acceptance_spec.md`](04_verification_and_acceptance_spec.md) | 定義 5 大回歸測試關卡、位元吻合判準、週期延遲容許值、故障診斷流 | `REQ-VERIF-*` | 驗證工程師、CI/CD、AI Agent |
+| **SRS** | [`00_system_requirements_spec.md`](00_system_requirements_spec.md) | 定義系統功能、功耗（<15μW待機）、面積（<25k門）、記憶體（18KB SRAM）上限 | `REQ-SYS-*` | 系統架構師、AI Agent |
+| **HIS** | [`01_hardware_interface_spec.md`](01_hardware_interface_spec.md) | 定義 APB3 匯流排協定、位元級暫存器定義、中斷握手、單線 DDR PDM 與 BIST 引腳 | `REQ-BUS-*` | 數位 IC、韌體、AI Agent |
+| **AGS** | [`02_algorithm_and_golden_model_spec.md`](02_algorithm_and_golden_model_spec.md) | 定義數學轉換公式、INT8 定點化縮放、雙麥波束成形、32-bit MISR BIST 與測試向量 | `REQ-ALG-*` | 演算法、驗證、AI Agent |
+| **SWS** | [`03_firmware_and_software_spec.md`](03_firmware_and_software_spec.md) | 定義 ITCM/DTCM 映射、Mini-POST 自檢、2-Tier 上下文 FSM、LED 狀態碼與組譯規範 | `REQ-FW-*` | 韌體工程師、AI Agent |
+| **VAS** | [`04_verification_and_acceptance_spec.md`](04_verification_and_acceptance_spec.md) | 定義 7 大回歸測試關卡、位元吻合判準、週期延遲容許值、7點故障注入診斷流 | `REQ-VERIF-*` | 驗證工程師、CI/CD、AI Agent |
 | **AGD** | [`05_ai_agent_development_guide.md`](05_ai_agent_development_guide.md) | 規範 AI Agent 的工作流、唯讀/寫入邊界、禁止行為、自我驗收清單 | `RULE-AI-*` | Autonomous AI Agents |
 | **TMP** | [`06_task_worklog_template.md`](06_task_worklog_template.md) | AI Agent 完成任務時提交的結構化日誌格式 | N/A | AI Agent, Reviewer |
 
@@ -57,17 +57,18 @@ docs/spec/
 2. **位元精確 (Bit-True Invariance)**：
    演算法模型（[`model/`](../../model)）、數位硬體（[`rtl/`](../../rtl)）與週期精確模擬器（[`sim/simulator/`](../../sim/simulator)）三者之間的計算結果必須具備 **100% 位元精確一致性**。
 3. **資源硬性約束 (Resource Hard Budgets)**：
-   - 晶片內記憶體總和不得超出 **64 KB**（目前配置 16 KB SRAM：8KB Boot ROM + 8KB Data SRAM）。
+   - 晶片內記憶體總和不得超出 **64 KB**（目前 v2.0 配置 18 KB SRAM：8KB Boot ROM + 8KB Data RAM + 1KB Weight RAM + 1KB Audio FIFO）。
+   - 邏輯閘數預算上限 **< 25,000 門**（標稱約 22,800 門）。
    - 杜絕任何外部 DRAM 依賴。
-   - 待機功耗必須符合 $< 20\text{ }\mu\text{W}$ 設計標準。
+   - 待機功耗必須符合 $< 20\text{ }\mu\text{W}$ 設計標準（實測 $< 15\text{ }\mu\text{W}$）。
 4. **綠燈回歸交付 (Green Regression Handover)**：
    任何任務結束前的必要交付條件是執行：
    ```bash
    python3 sim/run_simulator.py --mode regression
    ```
-   **5 項回歸測試必須全數通過 (PASS)**，不可有任何退化（Regression）。
+   **7 項回歸測試必須全數通過 (PASS)**，不可有任何退化（Regression）。
 5. **變更可追蹤性 (Traceability)**：
-   每次修改代碼必須在工作摘要中標註所關聯的 Requirement ID（如 `REQ-VAD-002`）。
+   每次修改代碼必須在工作摘要中標註所關聯的 Requirement ID（如 `REQ-VAD-002`, `REQ-BIST-001`）。
 
 ---
 

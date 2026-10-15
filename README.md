@@ -95,7 +95,9 @@ python3 sim/run_simulator.py --mode scenario --vcd sim/waves_soc.vcd --dashboard
 
 ```text
 smart_watch/
-├── docs/                       # 設計規格與說明文件
+├── docs/                       # 設計規格與說明文件 (SDD 框架與 PRD)
+│   ├── prd/                           # 產品需求文件 (00_wearable_audio_ai_prd.md)
+│   ├── spec/                          # 形式化 SSOT 規格書 (00_SRS ~ 06_TMP, zh-TW & en)
 │   ├── developer_onboarding_guide.md  # 🔰 新進開發人員快速入門指引
 │   ├── simulator_guide.md             # 模擬器架構與詳細操作手冊
 │   ├── system_architecture.md         # 系統模組架構與時序規範
@@ -105,25 +107,27 @@ smart_watch/
 │   ├── golden_vad.py                  # VAD 短時能量黃金模型
 │   ├── golden_mfcc.py                 # MFCC 特徵萃取黃金模型
 │   ├── golden_npu.py                  # DS-CNN INT8 定點推論模型
-│   └── golden_vectors/                # 導出的標準測試向量與權重
-├── rtl/                        # Verilog 硬體電路描述
-│   ├── afe/                           # PDM 接收、CIC 降頻濾波器、音訊 FIFO
+│   ├── golden_bist.py                 # 32-bit LFSR PRPG + MISR BIST 黃金特徵碼模型
+│   └── golden_vectors/                # 導出的標準測試向量、權重與 BIST 特徵碼
+├── rtl/                        # Verilog 硬體電路描述 (可合成 Verilog-2001)
+│   ├── afe/                           # PDM 接收、CIC 降頻濾波器、512w Pre-Roll FIFO、微波束成形
 │   ├── vad/                           # 第一級 Always-on 硬體 VAD 核心
-│   ├── npu/                           # 第二級 KWS NPU MAC 陣列與狀態機
+│   ├── npu/                           # 第二級 KWS NPU MAC 陣列、狀態機與 1KB 雙 Bank 權重 RAM
+│   ├── bist/                          # 5ms 生產硬體 ATE BIST 引擎 (LFSR + MISR)
 │   ├── cpu/                           # 32-bit RISC-V PicoRV32 CPU
-│   ├── bus/                           # APB 匯流排適配器
-│   └── top/                           # 異質 SoC 頂層電路
-├── sim/                        # 模擬驗證與視覺化介面
+│   ├── bus/                           # APB 匯流排適配器與解碼器
+│   └── top/                           # 異質 SoC 頂層電路 (kws_accelerator_subsys)
+├── sim/                        # 模擬驗證與視覺化介面 (純 Python 零依賴)
 │   ├── simulator/                     # 週期精確 Python SoC 模擬器核心庫
-│   │   ├── cpu.py, bus.py, afe.py, vad.py, npu.py, power.py, vcd.py, i18n.py ...
-│   ├── run_simulator.py               # 統一模擬執行驅動程式 (支援 --lang 多國語言)
+│   │   ├── cpu.py, bus.py, afe.py, vad.py, npu.py, bist.py, power.py, vcd.py, i18n.py ...
+│   ├── run_simulator.py               # 統一模擬執行驅動程式 (支援 7 項回歸測試與 --lang 多國語言)
 │   ├── run_sim.py                     # 回歸測試相容腳本
 │   ├── web_server.py                  # 即時硬體 Web 伺服器後端
 │   ├── smartwatch_simulator_ui.html   # 視覺化互動 HTML5 Web GUI (內建 i18n 即時切換)
-│   ├── simulator_dashboard.html       # 獨立式全系統架構儀表板 (內建 i18n 即時切換)
-│   └── waves_soc.vcd                  # 匯出的數位邏輯波形檔
+│   ├── simulator_dashboard.html       # 獨立式全系統架構儀表板 (含極座標指向圖與 BIST 覆蓋率)
+│   └── waves_soc.vcd                  # 匯出的數位邏輯波形檔 (IEEE 1364)
 └── sw/                         # 嵌入式韌體與工具鏈
-    ├── app/                           # 應用程式源碼 (main.s, main.c)
+    ├── app/                           # 應用程式源碼 (main.s, main.c, Mini-POST 自檢)
     ├── include/                       # 暫存器巨集定義 (soc_regs.h)
     ├── build_firmware.py              # 純 Python 輕量 RISC-V 組譯器
     └── firmware.hex                   # 編譯產生的 32-bit 韌體機器碼

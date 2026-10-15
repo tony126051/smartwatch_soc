@@ -102,7 +102,9 @@ python3 sim/run_simulator.py --mode scenario --vcd sim/waves_soc.vcd --dashboard
 
 ```text
 smart_watch/
-├── docs/                       # 設計仕様書と解説マニュアル
+├── docs/                       # 設計仕様書、SDD フレームワーク & PRD
+│   ├── prd/                           # 製品要求仕様書 (00_wearable_audio_ai_prd.md)
+│   ├── spec/                          # 形式的 SSOT 仕様書群 (00_SRS ~ 06_TMP, zh-TW & en)
 │   ├── developer_onboarding_guide.md  # 開発者オンボーディングガイド
 │   ├── simulator_guide.md             # シミュレータ操作・アーキテクチャ詳細手引
 │   ├── system_architecture.md         # システムタイミング・回路設計仕様
@@ -112,25 +114,27 @@ smart_watch/
 │   ├── golden_vad.py                  # VAD 短時間エネルギーゴールデンモデル
 │   ├── golden_mfcc.py                 # MFCC 特徴抽出モデル
 │   ├── golden_npu.py                  # DS-CNN INT8 固定小数点推論モデル
-│   └── golden_vectors/                # ゴールデンテストベクトルと重み
-├── rtl/                        # 合成可能 Verilog HDL 回路記述
-│   ├── afe/                           # PDM 受信器、CIC フィルタ、音声 FIFO
+│   ├── golden_bist.py                 # 32-bit LFSR PRPG + MISR BIST ゴールデンシグネチャモデル
+│   └── golden_vectors/                # ゴールデンテストベクトル、重み、および BIST シグネチャ
+├── rtl/                        # 合成可能 Verilog HDL 回路記述 (Verilog-2001)
+│   ├── afe/                           # PDM 受信器、CIC フィルタ、512w Pre-Roll FIFO、微小ビーム形成
 │   ├── vad/                           # 第1段 常時稼働ハードウェア VAD コア
-│   ├── npu/                           # 第2段 KWS NPU MAC アレイ & FSM
+│   ├── npu/                           # 第2段 KWS NPU MAC アレイ、FSM & 1KB デュアルバンク重み RAM
+│   ├── bist/                          # 5ms 製造ハードウェア ATE BIST エンジン (LFSR + MISR)
 │   ├── cpu/                           # 32-bit RISC-V PicoRV32 プロセッサ
-│   ├── bus/                           # APB バスブリッジ & アダプタ
-│   └── top/                           # SoC トップレベル統合回路
-├── sim/                        # シミュレーション検証 & 視覚化スイート
+│   ├── bus/                           # APB バスブリッジ & デコーダ
+│   └── top/                           # SoC トップレベル統合回路 (kws_accelerator_subsys)
+├── sim/                        # シミュレーション検証 & 視覚化スイート (純 Python 依存ゼロ)
 │   ├── simulator/                     # サイクル正確 Python SoC シミュレータ
-│   │   ├── cpu.py, bus.py, afe.py, vad.py, npu.py, power.py, vcd.py, i18n.py ...
-│   ├── run_simulator.py               # 統一シミュレーション実行スクリプト (--lang 対応)
-│   ├── run_sim.py                     # EDA ツール検証スクリプト (iverilog)
+│   │   ├── cpu.py, bus.py, afe.py, vad.py, npu.py, bist.py, power.py, vcd.py, i18n.py ...
+│   ├── run_simulator.py               # 統一シミュレーション実行スクリプト (7回帰テスト、--lang 対応)
+│   ├── run_sim.py                     # 回帰テスト互換スクリプト
 │   ├── web_server.py                  # リアルタイム Web サーバーバックエンド
 │   ├── smartwatch_simulator_ui.html   # インタラクティブ HTML5 Web GUI (多言語対応)
-│   ├── simulator_dashboard.html       # 全システムアーキテクチャダッシュボード
-│   └── waves_soc.vcd                  # 出力されたデジタル波形ファイル
+│   ├── simulator_dashboard.html       # 全システムダッシュボード (指向特性極座標図 & BIST メーター)
+│   └── waves_soc.vcd                  # 出力されたデジタル波形ファイル (IEEE 1364)
 └── sw/                         # 組込みファームウェア & ツールチェーン
-    ├── app/                           # ソースコード (main.s, main.c)
+    ├── app/                           # ソースコード (main.s, main.c, Mini-POST 自己診断)
     ├── include/                       # レジスタ定義ヘッダ (soc_regs.h)
     ├── build_firmware.py              # 純 Python 軽量 RISC-V アセンブラ
     └── firmware.hex                   # コンパイル済 32-bit マシンコード
