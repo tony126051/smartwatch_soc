@@ -1,6 +1,6 @@
 # ⌚ Edge AI Smartwatch SoC Design & Verification Platform
 
-[繁體中文](README.md) | [English](README_EN.md) | [日本語](README_JA.md)
+[繁體中文](README.md) | [English](README_EN.md) | [日本語](README_JA.md) | [📜 Version History (Changelog)](CHANGELOG_EN.md)
 
 This project provides a complete **Two-Stage Voice Wakeup System-on-Chip (SoC)** designed for ultra-low-power smartwatches. It includes golden algorithm models, Verilog RTL descriptions, RISC-V embedded firmware, and a cycle-accurate, bit-true simulator equipped with a real-time interactive HTML5 Web GUI.
 

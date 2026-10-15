@@ -1,6 +1,6 @@
 # ⌚ Edge AI スマートウォッチ SoC 設計・シミュレーション検証プラットフォーム
 
-[繁體中文](README.md) | [English](README_EN.md) | [日本語](README_JA.md)
+[繁體中文](README.md) | [English](README_EN.md) | [日本語](README_JA.md) | [📜 バージョン履歴 (Changelog)](CHANGELOG.md)
 
 本プロジェクトは、超低消費電力スマートウォッチ向けの **2段階音声起動（Two-Stage Voice Wakeup）システムオンチップ（SoC）** です。アルゴリズムのゴールデンモデル、Verilog RTL ハードウェア記述、RISC-V 組込みファームウェア、およびリアルタイム HTML5 Web GUI を備えたサイクル正確・ビット完全なシミュレータを含んでいます。
 
