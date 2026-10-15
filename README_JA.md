@@ -30,12 +30,14 @@ python3 sim/web_server.py 8080
 python3 sim/run_simulator.py --mode regression --lang ja
 # 言語オプション: --lang ja (日本語), --lang en (英語), --lang zh-TW (繁体中国語), --lang zh-CN (簡体中国語)
 ```
-以下の5大項目を自動検証します：
-1. RISC-V RV32I 命令セットおよびメモリ読み書き
-2. 音声フロントエンド（PDM $\to$ 3次 CIC フィルタ $\to$ 256ワード FIFO）
+以下の7大項目を完全ビット一致（100% Bit-True）で自動検証します：
+1. RISC-V RV32I 命令セットおよびカスタム命令 (`waitirq` 省電力命令)
+2. 音声フロントエンド（PDM $\to$ 3次 CIC フィルタ $\to$ 512ワード Pre-Roll FIFO 巻き戻し）
 3. 第1段 常時稼働（Always-on）ハードウェア VAD エネルギー計算および割込み発火
-4. 第2段 KWS NPU（DS-CNN INT8）行列演算および推論スコア
-5. システム起動、待機スリープ、音声起動シーケンスの完全検証
+4. 第2段 KWS NPU（DS-CNN INT8）行列演算（1024B デュアルバンク重み RAM）
+5. システム起動、Mini-POST 自己診断、待機スリープ、2-Tier コンテキスト感知音声起動
+6. デュアルマイク単線 DDR 両エッジデマルチプレクス（追加ピン 0）、16.7 dB 風切音抑制、空間指向性
+7. 5ms ハードウェア製造 BIST 特徴コード照合 (`0x92B6CDA5`) と 7点スタック故障検出（100% 検出率）
 
 ### 3. GDB スタイル対話型コマンドラインデバッガ
 ```bash
@@ -60,25 +62,27 @@ python3 sim/run_simulator.py --mode interactive --lang ja
 python3 sim/run_simulator.py --mode scenario --vcd sim/waves_soc.vcd --dashboard sim/simulator_dashboard.html --lang ja
 ```
 - 標準 IEEE 1364 `.vcd` ファイルを出力し、**GTKWave** や **PulseView** でクロックごとの信号遷移を確認可能。
-- 独立した対話型 HTML5 ダッシュボード [`sim/simulator_dashboard.html`](sim/simulator_dashboard.html) を出力（多言語切替対応）。
+- 独立した対話型 HTML5 ダッシュボード [`sim/simulator_dashboard.html`](sim/simulator_dashboard.html) を出力（カージオイド指向特性図、5ms BIST カバレッジ率表示、多言語切替対応）。
 
 ---
 
 ## 🏛️ ハードウェアアーキテクチャ概要
 
-外部 DRAM への高消費電力アクセスを排除するため、すべての特徴バッファとメモリはオンチップ（**On-chip 16 KB SRAM**）に統合されています：
+外部 DRAM への高消費電力アクセスを排除するため、すべての特徴バッファとメモリはオンチップ（**On-chip 18 KB SRAM**）に統合されています：
 
 ```
 +-----------------------------------------------------------------------------------+
-|                         Smartwatch SoC トップアーキテクチャ                       |
+|                         Smartwatch SoC トップアーキテクチャ (v2.0)                |
 |                                                                                   |
 |  [ 音声入力 ]             [ メモリサブシステム ]         [ コア演算ユニット ]     |
-|  1.024MHz PDM マイク       0x0000_0000: 8KB Boot ROM     32-bit RISC-V CPU        |
-|       │                    0x1000_0000: 8KB Data SRAM    (PicoRV32 RV32I)         |
-|       ▼                                                       ▲                   |
-|  [ AFE 前段回路 ]          [ システムバス & APB ]              │ (割込み信号)       |
-|  - 3次 CIC 間引き (R=64)   0x4000_0000: KWS Subsystem ───────┼── irq[0]: VAD 起動 |
-|  - 256ワード音声 FIFO      0x8000_0000: デバッグ LED レジスタ  └── irq[1]: NPU 完了 |
+|  単線 DDR PDM デュアルマイク0x0000_0000: 8KB Boot ROM     32-bit RISC-V CPU        |
+|  (両エッジサンプリング0ピン)0x1000_0000: 8KB Data SRAM    (PicoRV32 RV32I)         |
+|       │                                                       ▲                   |
+|       ▼                                                       │ (割込み信号)       |
+|  [ AFE 前段 & ビーム成形 ] [ システムバス & APB ]              ├── irq[0]: VAD 起動 |
+|  - 微小ビーム形成(>15dB抑圧)0x4000_0000: KWS Subsystem ───────┼── irq[1]: NPU 完了 |
+|  - 3次 CIC 間引き (R=64)   0x4000_00F8: 5ms BIST Engine ─────┴── irq[2]: タイマー |
+|  - 512ワード Pre-roll FIFO 0x8000_0000: デバッグ LED レジスタ                     |
 |       │                                                                           |
 |       ▼ (16kHz PCM)                                                               |
 |  [ 第1段：HW VAD (Always-on) ]  ────────────── 音声検出 ───────────┐              |
@@ -86,9 +90,9 @@ python3 sim/run_simulator.py --mode scenario --vcd sim/waves_soc.vcd --dashboard
 |                                                                    ▼              |
 |  [ 第2段：KWS NPU 加速器 ] ◄──────────────────────────────── CPU起動・特徴読込     |
 |  - 16x16 INT8 特徴 RAM (0x400)                                                    |
-|  - 256B 重み RAM (0x500)                                                          |
+|  - 1024B デュアルバンク重み RAM (0x500 - 0x8FF, 1サイクル瞬時切替)                |
 |  - DS-CNN (Conv1 -> DW -> PW -> GAP -> FC, 28,688 サイクル, 2.33ms)               |
-|  - Class 0 (背景ノイズ) と Class 1 (ウェイクワード) のスコア出力                   |
+|  - 8クラス音声コマンド Logits 出力 (2-Tier コンテキスト競合抑制 FSM)              |
 +-----------------------------------------------------------------------------------+
 ```
 

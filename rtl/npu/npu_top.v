@@ -25,8 +25,9 @@ module npu_top (
     
     // Weight RAM Programming Interface
     input  wire               wgt_wr_en,
-    input  wire [7:0]         wgt_wr_addr,
+    input  wire [9:0]         wgt_wr_addr,
     input  wire signed [7:0]  wgt_wr_data,
+    input  wire               weight_bank_sel,
     
     // Output Classification Results
     output reg  signed [31:0] score_class_0,
@@ -40,8 +41,9 @@ module npu_top (
     // Feature Buffer (256 bytes)
     reg signed [7:0] feat_mem [0:255];
     
-    // Weight RAM (256 bytes, accommodates all layers)
-    reg signed [7:0] weight_mem [0:255];
+    // Weight RAM (1024 bytes: Bank 0 = 0..511, Bank 1 = 512..1023)
+    reg signed [7:0] weight_mem [0:1023];
+    wire [9:0] bank_offset = weight_bank_sel ? 10'd512 : 10'd0;
     
     always @(posedge clk) begin
         if (feat_wr_en)
@@ -134,7 +136,7 @@ module npu_top (
                                 (c_cnt + kc_cnt >= 1) && (c_cnt + kc_cnt - 1 < 16)) begin
                                 pe_accum <= pe_accum + 
                                     feat_mem[get_feat_idx(r_cnt + kr_cnt - 1, c_cnt + kc_cnt - 1)] *
-                                    weight_mem[oc_cnt * 9 + kr_cnt * 3 + kc_cnt];
+                                    weight_mem[bank_offset + oc_cnt * 9 + kr_cnt * 3 + kc_cnt];
                             end
                             kc_cnt <= kc_cnt + 1'b1;
                         end else begin
@@ -180,7 +182,7 @@ module npu_top (
                                 (c_cnt + kc_cnt >= 1) && (c_cnt + kc_cnt - 1 < 16)) begin
                                 pe_accum <= pe_accum + 
                                     act_buf_1[(oc_cnt << 8) + ((r_cnt + kr_cnt - 1) << 4) + (c_cnt + kc_cnt - 1)] *
-                                    weight_mem[36 + oc_cnt * 9 + kr_cnt * 3 + kc_cnt];
+                                    weight_mem[bank_offset + 36 + oc_cnt * 9 + kr_cnt * 3 + kc_cnt];
                             end
                             kc_cnt <= kc_cnt + 1'b1;
                         end else begin
@@ -223,7 +225,7 @@ module npu_top (
                     if (ic_cnt < 4) begin
                         pe_accum <= pe_accum + 
                             act_buf_2[(ic_cnt << 8) + (r_cnt << 4) + c_cnt] *
-                            weight_mem[72 + oc_cnt * 4 + ic_cnt];
+                            weight_mem[bank_offset + 72 + oc_cnt * 4 + ic_cnt];
                         ic_cnt <= ic_cnt + 1'b1;
                     end else begin
                         act_buf_pw[(oc_cnt << 8) + (r_cnt << 4) + c_cnt] <= 
@@ -282,7 +284,7 @@ module npu_top (
                     // Weight base for FC: 72 + 32 = 104
                     if (ic_cnt < 8) begin
                         // gap_accum[ic_cnt] >> 8 is the average
-                        pe_accum <= pe_accum + (gap_accum[ic_cnt] >>> 8) * weight_mem[104 + oc_cnt * 8 + ic_cnt];
+                        pe_accum <= pe_accum + (gap_accum[ic_cnt] >>> 8) * weight_mem[bank_offset + 104 + oc_cnt * 8 + ic_cnt];
                         ic_cnt <= ic_cnt + 1'b1;
                     end else begin
                         if (oc_cnt == 0) begin

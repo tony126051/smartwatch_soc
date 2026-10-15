@@ -30,12 +30,14 @@ Open your browser and navigate to: **`http://localhost:8080/`**
 python3 sim/run_simulator.py --mode regression --lang en
 # Supported languages: --lang en (English), --lang zh-TW (Traditional Chinese), --lang zh-CN (Simplified Chinese), --lang ja (Japanese)
 ```
-Automatically verifies all 5 subsystems:
-1. RISC-V RV32I instruction set execution and memory read/write.
-2. Audio Front-End (PDM $\to$ 3rd-order CIC decimator $\to$ 256-word FIFO).
+Automatically verifies all 7 subsystems with 100% bit-true precision:
+1. RISC-V RV32I instruction set execution and custom instructions (`waitirq`).
+2. Audio Front-End (PDM $\to$ 3rd-order CIC decimator $\to$ 512-word Pre-Roll FIFO rewind).
 3. Stage 1 Always-on Hardware VAD short-time energy calculation and wakeup interrupt.
-4. Stage 2 KWS NPU (DS-CNN INT8) hardware matrix engine and classification scores.
-5. Full-system firmware boot sequence, standby sleep, and voice wakeup sequence.
+4. Stage 2 KWS NPU (DS-CNN INT8) hardware matrix engine (1024B Dual-Bank Weight RAM).
+5. Full-system firmware boot sequence, Mini-POST self-test, standby sleep, and 2-Tier context FSM.
+6. Dual-Mic single-wire DDR dual-edge demuxing (0 extra pins), 16.7 dB wind rejection, and spatial directivity.
+7. 5ms Production Hardware BIST golden signature matching (`0x92B6CDA5`) and 7-point stuck-at fault detection (100% coverage).
 
 ### 3. Interactive GDB-Style Terminal Debugger
 ```bash
@@ -60,25 +62,27 @@ Supported CLI commands:
 python3 sim/run_simulator.py --mode scenario --vcd sim/waves_soc.vcd --dashboard sim/simulator_dashboard.html --lang en
 ```
 - Exports standard IEEE 1364 `.vcd` files directly viewable in **GTKWave** or **PulseView**.
-- Generates a standalone interactive HTML5 dashboard [`sim/simulator_dashboard.html`](sim/simulator_dashboard.html) with multi-language support.
+- Generates a standalone interactive HTML5 dashboard [`sim/simulator_dashboard.html`](sim/simulator_dashboard.html) featuring Cardioid beam directivity polar plots, 5ms BIST fault coverage analysis, and multi-language support.
 
 ---
 
 ## 🏛️ Hardware Architecture Overview
 
-All feature buffers and memory remain on-chip (**16 KB On-chip SRAM**) to prevent energy-expensive off-chip DRAM access:
+All feature buffers and memory remain on-chip (**18 KB On-chip SRAM**) to prevent energy-expensive off-chip DRAM access:
 
 ```
 +-----------------------------------------------------------------------------------+
-|                         Smartwatch SoC Top Architecture                           |
+|                         Smartwatch SoC Top Architecture (v2.0)                    |
 |                                                                                   |
 |  [ Audio Input ]           [ Memory Subsystem ]          [ Processing Core ]      |
-|  1.024MHz PDM Mic           0x0000_0000: 8KB Boot ROM     32-bit RISC-V CPU       |
-|       │                     0x1000_0000: 8KB Data SRAM    (PicoRV32 RV32I)        |
-|       ▼                                                       ▲                   |
-|  [ AFE Front-End ]         [ System Bus & APB ]               │ (Interrupts)      |
-|  - 3-Stage CIC (R=64)       0x4000_0000: KWS Subsystem ───────┼── irq[0]: VAD IRQ |
-|  - 256-word Audio FIFO      0x8000_0000: Debug LED Reg        └── irq[1]: NPU IRQ |
+|  Single-wire DDR PDM Mics   0x0000_0000: 8KB Boot ROM     32-bit RISC-V CPU       |
+|  (Pos/Neg Edge, 0 extra pin)0x1000_0000: 8KB Data SRAM    (PicoRV32 RV32I)        |
+|       │                                                       ▲                   |
+|       ▼                                                       │ (Interrupts)      |
+|  [ AFE & Beamformer ]      [ System Bus & APB ]               ├── irq[0]: VAD IRQ |
+|  - Spatial Subtractor      0x4000_0000: KWS Subsystem ───────┼── irq[1]: NPU IRQ |
+|  - 3-Stage CIC (R=64)       0x4000_00F8: 5ms BIST Engine ─────┴── irq[2]: Timer   |
+|  - 512-word Pre-roll FIFO   0x8000_0000: Debug LED Reg                            |
 |       │                                                                           |
 |       ▼ (16kHz PCM)                                                               |
 |  [ Stage 1: Hardware VAD (Always-on) ]  ────── Voice Detected ────────┐           |
@@ -86,9 +90,9 @@ All feature buffers and memory remain on-chip (**16 KB On-chip SRAM**) to preven
 |                                                                       ▼           |
 |  [ Stage 2: KWS NPU Accelerator ] ◄─────────────────────────── Wake CPU & Load Feat|
 |  - 16x16 INT8 Feature RAM (0x400)                                                 |
-|  - 256B Weight RAM (0x500)                                                        |
+|  - 1024B Dual-Bank Weight RAM (0x500 - 0x8FF, 1-cycle instant toggle)             |
 |  - DS-CNN (Conv1 -> DW -> PW -> GAP -> FC, 28,688 cycles, 2.33ms)                |
-|  - Outputs Class 0 (Noise) and Class 1 (Keyword) Scores                           |
+|  - Outputs 8-Class Logits (2-Tier Context Competitor Suppression FSM)             |
 +-----------------------------------------------------------------------------------+
 ```
 

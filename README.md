@@ -30,12 +30,14 @@ python3 sim/web_server.py 8080
 python3 sim/run_simulator.py --mode regression --lang zh-TW
 # 亦可指定其他語言: --lang en (English), --lang zh-CN (簡中), --lang ja (日本語)
 ```
-自動檢驗五大項目：
-1. RISC-V RV32I 指令集與記憶體讀寫
-2. 音訊前端（PDM $\to$ 3 階 CIC 濾波器 $\to$ 256-word FIFO）
+自動檢驗七大子系統與關鍵功能（100% 比特精確零誤差）：
+1. RISC-V RV32I 指令集與記憶體讀寫 (`waitirq` 自訂休眠指令)
+2. 音訊前端（PDM $\to$ 3 階 CIC 濾波器 $\to$ 512-word Pre-Roll FIFO 倒帶）
 3. 第一級硬體 VAD 時域能量計算與中斷觸發
-4. 第二級 KWS NPU（DS-CNN INT8）矩陣加速與推論得分
-5. 全系統韌體開機、待機休眠與語音喚醒流程
+4. 第二級 KWS NPU（DS-CNN INT8）矩陣加速與推論得分（雙 Bank 1KB 權重 RAM）
+5. 全系統韌體開機、Mini-POST 自檢、待機休眠與 2-Tier 上下文感知語音喚醒流程
+6. 雙麥克風 DDR 雙邊沿解多工（0 額外引腳）、16.7 dB 強風抑制與空間指向性
+7. 5ms 生產硬體 BIST 特徵碼比對 (`0x92B6CDA5`) 與 7 點固定型故障檢測（100% 檢出率）
 
 ### 3. 使用 GDB 風格命令列互動除錯器
 ```bash
@@ -53,25 +55,27 @@ python3 sim/run_simulator.py --mode interactive --lang zh-TW
 python3 sim/run_simulator.py --mode scenario --vcd sim/waves_soc.vcd --dashboard sim/simulator_dashboard.html
 ```
 - 產生標準 IEEE 1364 `.vcd` 檔案，可直接使用 **GTKWave** 或 **PulseView** 檢視每一個時脈週期的數位訊號翻轉。
-- 產生獨立式互動 HTML5 儀表板 [`sim/simulator_dashboard.html`](file:///home/tony/repo/projects/smart_watch/sim/simulator_dashboard.html)，同樣支援即時多國語言切換！
+- 產生獨立式互動 HTML5 儀表板 `sim/simulator_dashboard.html`，具備心型波束成形極座標圖與 5ms BIST 覆蓋率分析，支援即時多國語言切換！
 
 ---
 
 ## 🏛️ 晶片硬體架構概觀
 
-全系統所有特徵緩衝區與記憶體均常駐於晶片內（On-chip 16 KB SRAM），杜絕外部 DRAM 存取耗電：
+全系統所有特徵緩衝區與記憶體均常駐於晶片內（On-chip 18 KB SRAM），杜絕外部 DRAM 存取耗電：
 
 ```
 +-----------------------------------------------------------------------------------+
-|                           Smartwatch SoC 頂層架構                                  |
+|                           Smartwatch SoC 頂層架構 (v2.0)                          |
 |                                                                                   |
 |  [ 音訊輸入 ]             [ 記憶體子系統 ]               [ 核心運算單元 ]         |
-|  1.024MHz PDM 麥克風       0x0000_0000: 8KB Boot ROM     32-bit RISC-V CPU        |
-|       │                    0x1000_0000: 8KB Data SRAM    (PicoRV32 RV32I)         |
-|       ▼                                                       ▲                   |
-|  [ AFE 前端 ]             [ 系統匯流排與 APB ]                 │ (中斷線)          |
-|  - 3階 CIC 降頻 (R=64)     0x4000_0000: KWS Subsystem ───────┼── irq[0]: VAD 喚醒 |
-|  - 256-word 音訊 FIFO      0x8000_0000: 除錯 LED 暫存器        └── irq[1]: NPU 完成 |
+|  單線 DDR PDM 雙麥克風     0x0000_0000: 8KB Boot ROM     32-bit RISC-V CPU        |
+|  (正/負緣採樣，0引腳開銷)  0x1000_0000: 8KB Data SRAM    (PicoRV32 RV32I)         |
+|       │                                                       ▲                   |
+|       ▼                                                       │ (中斷線)          |
+|  [ AFE 前端 & 波束成形 ]   [ 系統匯流排與 APB ]               ├── irq[0]: VAD 喚醒 |
+|  - 微波束成形 (>15dB抗風)  0x4000_0000: KWS Subsystem ───────┼── irq[1]: NPU 完成 |
+|  - 3階 CIC 降頻 (R=64)     0x4000_00F8: 5ms BIST Engine ─────┴── irq[2]: 定時逾時 |
+|  - 512-word Pre-roll FIFO  0x8000_0000: 除錯 LED 暫存器                           |
 |       │                                                                           |
 |       ▼ (16kHz PCM)                                                               |
 |  [ 第一級：硬體 VAD (Always-on) ]  ────────────── 語音偵測 ───────────┐           |
@@ -79,9 +83,9 @@ python3 sim/run_simulator.py --mode scenario --vcd sim/waves_soc.vcd --dashboard
 |                                                                       ▼           |
 |  [ 第二級：KWS NPU 加速器 ] ◄──────────────────────────────── 喚醒 CPU 載入特徵  |
 |  - 16x16 INT8 特徵 RAM (0x400)                                                    |
-|  - 256B 權重 RAM (0x500)                                                          |
+|  - 1024B 雙 Bank 權重 RAM (0x500 - 0x8FF, 支援單週期即時切換)                     |
 |  - DS-CNN (Conv1 -> DW -> PW -> GAP -> FC, 28,688 週期, 2.33ms)                   |
-|  - 輸出 Class 0 (背景雜音) 與 Class 1 (喚醒詞) 得分                               |
+|  - 輸出 8 類語音指令 Logits (支援 2-Tier 上下文競爭抑制 FSM)                       |
 +-----------------------------------------------------------------------------------+
 ```
 

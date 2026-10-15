@@ -5,9 +5,10 @@ Smartwatch SoC Simulator Package
 from .types import *
 from .cpu import RiscvCpu
 from .bus import SoCBus
-from .afe import AudioFrontEnd, AudioFifo, CicDecimatorQ64
+from .afe import AudioFrontEnd, AudioFifo, CicDecimatorQ64, DualEdgePdmDemuxer, HardwareBeamformer
 from .vad import HardwareVad
 from .npu import KwsNpu
+from .bist import BistEngine
 from .power import PowerProfiler
 from .vcd import VcdWriter
 from .soc import SmartwatchSoC
@@ -22,8 +23,11 @@ __all__ = [
     "AudioFrontEnd",
     "AudioFifo",
     "CicDecimatorQ64",
+    "DualEdgePdmDemuxer",
+    "HardwareBeamformer",
     "HardwareVad",
     "KwsNpu",
+    "BistEngine",
     "PowerProfiler",
     "VcdWriter",
     "InteractiveSimulatorCLI",

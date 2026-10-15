@@ -8,16 +8,24 @@ from .types import u32, u16, u8, ROM_BASE, ROM_SIZE, RAM_BASE, RAM_SIZE, KWS_BAS
 from .afe import AudioFrontEnd
 from .vad import HardwareVad
 from .npu import KwsNpu
+from .bist import BistEngine
 
 class SoCBus:
-    def __init__(self, afe: AudioFrontEnd, vad: HardwareVad, npu: KwsNpu):
+    def __init__(self, afe: AudioFrontEnd, vad: HardwareVad, npu: KwsNpu, bist: Optional[BistEngine] = None):
         self.afe = afe
         self.vad = vad
         self.npu = npu
+        self.bist = bist if bist is not None else BistEngine()
         
         # 8 KB Boot ROM & 8 KB Data SRAM
         self.rom = bytearray(ROM_SIZE)
         self.ram = bytearray(RAM_SIZE)
+        
+        # 2-Tier Context FSM registers
+        self.context_state = 0
+        self.gating_en = True
+        self.window_timer = 0
+        self.window_timeout = False
         
         # Debug LEDs
         self.debug_leds = 0x00
@@ -29,6 +37,11 @@ class SoCBus:
     def reset(self):
         self.ram = bytearray(RAM_SIZE)
         self.debug_leds = 0x00
+        self.context_state = 0
+        self.gating_en = True
+        self.window_timer = 0
+        self.window_timeout = False
+        self.bist.reset()
         self.last_write = None
         self.last_read = None
 
@@ -99,9 +112,21 @@ class SoCBus:
                 word_val = self.afe.read_reg(offset & ~3)
             elif offset < 0x020: # VAD
                 word_val = self.vad.read_reg(offset & ~3)
-            elif offset < 0x040: # NPU control/status/score
+            elif offset < 0x030: # NPU control/status/score
                 word_val = self.npu.read_reg(offset & ~3)
-            elif 0x400 <= offset < 0x600: # NPU RAMs
+            elif offset < 0x040: # AFE Wind & Pre-Roll
+                word_val = self.afe.read_reg(offset & ~3)
+            elif offset == 0x070: # SYS_CONTEXT_CTRL
+                word_val = (self.context_state & 3) | ((1 if self.gating_en else 0) << 2)
+                if self.window_timer > 0: word_val |= (1 << 3)
+                if self.window_timeout: word_val |= (1 << 4)
+            elif offset == 0x074: # SYS_WINDOW_TIMER
+                word_val = self.window_timer & 0xFFFFFF
+            elif 0x0F0 <= offset < 0x100: # BIST Subsystem (0x0F8, 0x0FC)
+                word_val = self.bist.read_reg(offset & ~3)
+            elif 0x400 <= offset < 0x500: # NPU Feature RAM
+                word_val = self.npu.read_reg(offset)
+            elif 0x500 <= offset < 0x900: # NPU Dual-Bank Weight RAM (1024B)
                 word_val = self.npu.read_reg(offset)
             else:
                 word_val = 0
@@ -146,9 +171,21 @@ class SoCBus:
                 self.afe.write_reg(offset & ~3, val)
             elif offset < 0x020: # VAD
                 self.vad.write_reg(offset & ~3, val)
-            elif offset < 0x040: # NPU
+            elif offset < 0x030: # NPU
                 self.npu.write_reg(offset & ~3, val)
-            elif 0x400 <= offset < 0x600: # NPU RAMs
+            elif offset < 0x040: # AFE Wind & Pre-Roll
+                self.afe.write_reg(offset & ~3, val)
+            elif offset == 0x070: # SYS_CONTEXT_CTRL
+                self.context_state = val & 3
+                self.gating_en = bool(val & (1 << 2))
+                if val & (1 << 4): self.window_timeout = False
+            elif offset == 0x074: # SYS_WINDOW_TIMER
+                self.window_timer = val & 0xFFFFFF
+            elif 0x0F0 <= offset < 0x100: # BIST Subsystem (0x0F8, 0x0FC)
+                self.bist.write_reg(offset & ~3, val)
+            elif 0x400 <= offset < 0x500: # NPU Feature RAM
+                self.npu.write_reg(offset, val)
+            elif 0x500 <= offset < 0x900: # NPU Dual-Bank Weight RAM (1024B)
                 self.npu.write_reg(offset, val)
 
         # 0x8...: System Debug LEDs
@@ -156,3 +193,4 @@ class SoCBus:
             self.debug_leds = val & 0xFF
 
         self.last_write = (addr, val, size)
+

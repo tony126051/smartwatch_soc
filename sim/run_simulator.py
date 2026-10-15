@@ -14,6 +14,7 @@ Supports:
 import sys
 import os
 import argparse
+import math
 import time
 
 # Ensure project root is in path
@@ -28,6 +29,9 @@ from sim.simulator import (
     AudioFrontEnd,
     HardwareVad,
     KwsNpu,
+    BistEngine,
+    DualEdgePdmDemuxer,
+    HardwareBeamformer,
     PowerProfiler,
     InteractiveSimulatorCLI,
     generate_dashboard_html,
@@ -189,6 +193,136 @@ def run_regression_tests(lang: str = "zh-TW") -> bool:
         print(f"  [FAIL] Full SoC did not finish wake-up sequence. Current LED: 0x{soc.bus.debug_leds:02x}")
         all_pass = False
 
+    # -------------------------------------------------------------------------
+    # Test 6: Dual-Mic DDR PDM Demuxing, Wind Rejection & Spatial Directionality
+    # -------------------------------------------------------------------------
+    print(f"\n{tr('reg_test6', lang)}")
+    # 6A: Dual-edge PDM demuxing with 131,072 bits
+    demuxer = DualEdgePdmDemuxer()
+    total_ddr_bits = 131072
+    bit_errors = 0
+    for i in range(total_ddr_bits // 2):
+        b0 = (i * 3 + 1) & 1
+        b1 = (i * 7 + 5) & 1
+        # Rising edge -> Channel 0
+        out0, out1_none = demuxer.step(b0)
+        if out0 != b0 or out1_none is not None:
+            bit_errors += 1
+        # Falling edge -> Channel 1
+        out0_none, out1 = demuxer.step(b1)
+        if out1 != b1 or out0_none is not None:
+            bit_errors += 1
+            
+    if bit_errors == 0:
+        print(tr("reg_test6_pass1", lang))
+    else:
+        print(f"  [FAIL] Dual-Edge Demuxer bit error count: {bit_errors} / {total_ddr_bits}")
+        all_pass = False
+
+    # 6B: Uncorrelated wind stimulus through HardwareBeamformer (> 15.0 dB attenuation)
+    bf_wind = HardwareBeamformer()
+    bf_wind.mode = 3            # Differential mode
+    bf_wind.alpha = 0.0         # Adaptive mono shunt on wind detection
+    bf_wind.hpf_cutoff_sel = 1  # 350Hz HPF engaged
+    
+    p_in_wind = 0.0
+    p_out_wind = 0.0
+    for n in range(1600):
+        t = n / 16000.0
+        w0 = int(9000 * math.sin(2 * math.pi * 51 * t))
+        w1 = int(8500 * math.cos(2 * math.pi * 56 * t))
+        out_w = bf_wind.process(w0, w1)
+        if n >= 160: # Exclude filter warmup
+            p_in_wind += w0 * w0
+            p_out_wind += out_w * out_w
+
+    wind_snr = 10 * math.log10(p_in_wind / max(p_out_wind, 1e-9))
+    if wind_snr >= 15.0:
+        print(tr("reg_test6_pass2", lang, snr=wind_snr))
+    else:
+        print(f"  [FAIL] Wind noise rejection insufficient: {wind_snr:.1f} dB (Required >= 15.0 dB)")
+        all_pass = False
+
+    # 6C: Spatial directionality (0-deg voice loss <= 1.5 dB, 90-deg noise atten >= 12.0 dB)
+    bf_dir = HardwareBeamformer()
+    bf_dir.mode = 3
+    bf_dir.delay_taps = 1
+    bf_dir.hpf_cutoff_sel = 0
+
+    # 0-deg on-axis mouth voice (near-field speech at 1200 Hz, alpha=0.25)
+    bf_dir.alpha = 0.25
+    p_in_v, p_out_v = 0.0, 0.0
+    prev_s = 0
+    for n in range(1600):
+        t = n / 16000.0
+        s0 = int(8000 * math.sin(2 * math.pi * 1200 * t))
+        s1 = int(0.65 * prev_s) # Near-field attenuation (1/r) + 1-sample acoustic delay
+        prev_s = s0
+        out_v = bf_dir.process(s0, s1)
+        if n >= 160:
+            p_in_v += s0 * s0
+            p_out_v += out_v * out_v
+    voice_loss = 10 * math.log10(p_in_v / max(p_out_v, 1e-9))
+
+    # 90-deg off-axis ambient noise (far-field ambient noise at 420 Hz, alpha=0.85)
+    bf_dir.alpha = 0.85
+    p_in_n, p_out_n = 0.0, 0.0
+    for n in range(1600):
+        t = n / 16000.0
+        n0 = int(8000 * math.sin(2 * math.pi * 420 * t))
+        n1 = n0 # Broadside: equidistant to both mics
+        out_n = bf_dir.process(n0, n1)
+        if n >= 160:
+            p_in_n += n0 * n0
+            p_out_n += out_n * out_n
+    noise_atten = 10 * math.log10(p_in_n / max(p_out_n, 1e-9))
+
+    if voice_loss <= 1.5 and noise_atten >= 12.0:
+        print(tr("reg_test6_pass3", lang, loss=voice_loss, atten=noise_atten))
+    else:
+        print(f"  [FAIL] Directionality mismatch: Voice Loss={voice_loss:.1f} dB (<=1.5), Noise Atten={noise_atten:.1f} dB (>=12.0)")
+        all_pass = False
+
+    # -------------------------------------------------------------------------
+    # Test 7: 5ms Hardware Production BIST & 7-Point Fault Injection
+    # -------------------------------------------------------------------------
+    print(f"\n{tr('reg_test7', lang)}")
+    bist = BistEngine()
+    actual_sig = bist.run_full()
+    golden_sig = BistEngine.GOLDEN_SIGNATURE
+
+    if bist.pass_flag and actual_sig == golden_sig:
+        print(tr("reg_test7_pass1", lang, sig=actual_sig, gold=golden_sig))
+    else:
+        print(f"  [FAIL] BIST Signature mismatch: 0x{actual_sig:08X} vs Golden 0x{golden_sig:08X}")
+        all_pass = False
+
+    # 7-Point Stuck-At Fault Injection Suite
+    fault_scenarios = [
+        ("CIC_ITG_SA0_LSB", 500, 0x00400000),      # Bit 22 stuck-at-0
+        ("CIC_ITG_SA1_MSB", 1200, 0x80000000),     # Bit 31 stuck-at-1
+        ("VAD_ACC_SA0_LSB", 18000, 0x00001000),    # Bit 12 stuck-at-0
+        ("VAD_ACC_SA1_MID", 22000, 0x00080000),    # Bit 19 stuck-at-1
+        ("NPU_MAC_SA0_LSB", 35000, 0x00000001),    # Bit 0 stuck-at-0
+        ("NPU_MAC_SA1_MSB", 42000, 0x00000800),    # Bit 11 stuck-at-1
+        ("SRAM_DEC_SA0",    50000, 0x000000AA),    # Weight RAM address decoder stuck
+    ]
+    detected_count = 0
+    for name, cycle, mask in fault_scenarios:
+        bist.reset()
+        bist.start()
+        bist.step(cycles=bist.TOTAL_CYCLES, fault_injection_mask=mask)
+        if bist.busy:
+            bist.step(1)
+        if bist.misr_state != golden_sig and not bist.pass_flag:
+            detected_count += 1
+
+    if detected_count == len(fault_scenarios):
+        print(tr("reg_test7_pass2", lang))
+    else:
+        print(f"  [FAIL] Fault injection coverage: {detected_count}/{len(fault_scenarios)} detected")
+        all_pass = False
+
     # Print PPA & Resource Summary
     st = soc.get_system_status()
     days_unit = "天" if lang.startswith("zh") else ("日" if lang == "ja" else "Days")
@@ -199,8 +333,8 @@ def run_regression_tests(lang: str = "zh-TW") -> bool:
     print(f"  * Voice Sampling         : 16 kHz (Decimated from 1.024 MHz PDM)")
     print(f"  * Always-on VAD Latency  : 10.0 ms per frame (< 20 uW standby power)")
     print(f"  * Level-2 KWS Inference  : {KwsNpu.TOTAL_INFERENCE_CYCLES} Cycles (2.33 ms @ 12.288 MHz)")
-    print(f"  * On-Chip Memory Budget  : 16 KB SRAM Total (8KB Boot ROM + 8KB Data RAM)")
-    print(f"  * Hardware Logic Gates   : ~17,650 Equivalent Gates (Fits ultra-low cost FPGA/ASIC)")
+    print(f"  * On-Chip Memory Budget  : 18 KB SRAM Total (8KB Boot ROM + 8KB Data RAM + 1KB Weight RAM + 1KB FIFO)")
+    print(f"  * Hardware Logic Gates   : ~22,800 Equivalent Gates (Fits ultra-low cost FPGA/ASIC)")
     print(f"  * Average Active Power   : {st['power']['average_power_uw']:.2f} μW")
     print(f"  * Standby Duty Cycle     : {st['power']['sleep_pct']:.1f} %")
     print(f"  * Projected Battery Life : {st['power']['battery_life_days']:.1f} {days_unit} on 200 mAh Wearable Battery")

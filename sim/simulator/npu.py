@@ -37,11 +37,13 @@ class KwsNpu:
     TOTAL_INFERENCE_CYCLES = CYCLES_CONV1 + CYCLES_DW + CYCLES_PW + CYCLES_GAP + CYCLES_FC
 
     def __init__(self):
-        # 256-byte Feature RAM & Weight RAM
+        # 256-byte Feature RAM & 1024-byte Dual-Bank Weight RAM (Bank 0: 0..511, Bank 1: 512..1023)
         self.feat_ram = bytearray(256)
-        self.wgt_ram = bytearray(256)
+        self.wgt_ram = bytearray(1024)
+        self.weight_bank_sel = 0
+        self.predicted_class = 0
         
-        # Load default golden weights
+        # Load default golden weights into Bank 0
         self.load_default_weights()
         
         # State & Control
@@ -51,6 +53,7 @@ class KwsNpu:
         self.keyword_detected = False
         self.score_0 = 0
         self.score_1 = 0
+        self.scores_8class = [0] * 8
         self.irq_npu_done = False
         
         # Cycle-accurate tracking
@@ -65,6 +68,7 @@ class KwsNpu:
         self.keyword_detected = False
         self.score_0 = 0
         self.score_1 = 0
+        self.predicted_class = 0
         self.irq_npu_done = False
         self.cycles_remaining_in_state = 0
         self.force_keyword = None
@@ -147,10 +151,12 @@ class KwsNpu:
         if self.force_keyword is True:
             self.score_0 = -35
             self.score_1 = 88
+            self.predicted_class = 1
             self.keyword_detected = True
         elif self.force_keyword is False:
             self.score_0 = 58
             self.score_1 = -51
+            self.predicted_class = 0
             self.keyword_detected = False
         else:
             # Convert 256 bytes feature map to 16x16 signed INT8
@@ -163,6 +169,7 @@ class KwsNpu:
             res = run_ds_cnn_inference(input_map, self.model_params)
             self.score_0 = res["fc_out"][0]
             self.score_1 = res["fc_out"][1]
+            self.predicted_class = res["class"]
             self.keyword_detected = (res["class"] == 1)
 
     # APB Register Access
@@ -170,19 +177,21 @@ class KwsNpu:
         if offset == 0x020: # NPU_CTRL
             bit0 = 1 if self.busy else 0
             bit1 = 1 if self.irq_npu_done else 0
-            return bit0 | (bit1 << 1)
+            bit2 = self.weight_bank_sel & 1
+            return bit0 | (bit1 << 1) | (bit2 << 2)
         elif offset == 0x024: # NPU_STATUS
             busy_bit = 1 if self.busy else 0
             done_bit = 1 if self.done else 0
             kw_bit   = 1 if self.keyword_detected else 0
-            return busy_bit | (done_bit << 1) | (kw_bit << 2)
+            cls_bits = (self.predicted_class & 7) << 4
+            return busy_bit | (done_bit << 1) | (kw_bit << 2) | cls_bits
         elif offset == 0x028: # NPU_SCORE0
             return u32(self.score_0)
         elif offset == 0x02C: # NPU_SCORE1
             return u32(self.score_1)
         elif 0x400 <= offset < 0x500:
             return self.feat_ram[offset - 0x400]
-        elif 0x500 <= offset < 0x600:
+        elif 0x500 <= offset < 0x900:
             return self.wgt_ram[offset - 0x500]
         return 0
 
@@ -192,7 +201,9 @@ class KwsNpu:
                 self.start_inference()
             if val & 2: # Clear IRQ
                 self.irq_npu_done = False
+            self.weight_bank_sel = (val >> 2) & 1
         elif 0x400 <= offset < 0x500: # Feature RAM
             self.feat_ram[offset - 0x400] = val & 0xFF
-        elif 0x500 <= offset < 0x600: # Weight RAM
+        elif 0x500 <= offset < 0x900: # Dual-Bank Weight RAM (1024 Bytes)
             self.wgt_ram[offset - 0x500] = val & 0xFF
+
